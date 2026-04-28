@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2-3歳便秘AI MVP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel" aria-live="polite">
+        <div id="progress" class="progress" hidden>
+          <div class="progress__meta">
+            <span id="progressLabel">基本確認</span>
+            <span id="progressCount">1 / 6</span>
+          </div>
+          <div class="progress__track"><div id="progressBar" class="progress__bar"></div></div>
+        </div>
+
+        <div id="screen"></div>
+
+        <nav id="nav" class="nav" hidden>
+          <button id="backButton" class="button button--secondary" type="button">戻る</button>
+          <button id="nextButton" class="button" type="button">次へ</button>
+        </nav>
+      </section>
+
+      <aside id="doctorPanel" class="doctor-panel" hidden>
+        <div class="doctor-panel__header">
+          <h2>診察支援ダッシュボード</h2>
+          <button id="copySummaryButton" class="button button--secondary button--small" type="button">コピー</button>
+        </div>
+        <div id="summaryOutput" class="review-dashboard"></div>
+        <h3>送信JSON</h3>
+        <pre id="jsonOutput"></pre>
+      </aside>
+    </main>
+
+    <script src="./src/questionnaire.js"></script>
+    <script src="./src/app.js"></script>
+  </body>
+</html>

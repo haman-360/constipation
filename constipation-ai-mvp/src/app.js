@@ -3,20 +3,36 @@ const {
   BASIC_IDS,
   visibleFieldIds,
   pruneHiddenAnswers,
+  normalizeDiaryAnswers,
+  mergeDiaryAnswers,
+  normalizeVisitMeta,
+  mergeVisitMeta,
   normalizeMultiSelection,
   hasSafetyNotice,
   generatePhysicianReview,
   generateSummary,
+  generateFacilityShare,
+  generatePatientMemo,
   branchMessage,
 } = window.ConstipationMvp;
 
-const SAFETY_TEXT = "強い腹痛、吐いた、食欲や機嫌がいつもと違う場合は、入力だけでなく受付または医療スタッフにもお伝えください。";
+const SAFETY_TEXT = "強い腹痛、吐いた、食欲も機嫌もいつもと違う場合は、受付または医療スタッフにもお伝えください。";
+const urlParams = new URLSearchParams(window.location.search);
+const STAFF_MODES = new Set(["staff", "doctor", "clinician"]);
+const isStaffMode = STAFF_MODES.has(urlParams.get("mode")) || urlParams.get("staff") === "1";
+const visitMetaFromUrl = normalizeVisitMeta({
+  patient_id: urlParams.get("patient_id") || urlParams.get("pid"),
+  visit_id: urlParams.get("visit_id") || urlParams.get("vid"),
+  visit_token: urlParams.get("visit_token") || urlParams.get("token"),
+});
 
 const state = {
   started: false,
   index: 0,
   answers: {},
+  diary: {},
   submitted: false,
+  dashboardMode: "full",
 };
 
 const els = {
@@ -31,8 +47,19 @@ const els = {
   doctorPanel: document.getElementById("doctorPanel"),
   summaryOutput: document.getElementById("summaryOutput"),
   jsonOutput: document.getElementById("jsonOutput"),
+  toggleDashboardModeButton: document.getElementById("toggleDashboardModeButton"),
   copySummaryButton: document.getElementById("copySummaryButton"),
+  copyFacilityShareButton: document.getElementById("copyFacilityShareButton"),
+  copyJsonButton: document.getElementById("copyJsonButton"),
+  printPdfButton: document.getElementById("printPdfButton"),
 };
+
+const appShell = document.querySelector(".app-shell");
+
+function setDoctorPanelVisible(visible) {
+  els.doctorPanel.hidden = !visible;
+  appShell.classList.toggle("app-shell--patient-only", !visible);
+}
 
 function currentFlow() {
   return visibleFieldIds(state.answers);
@@ -82,33 +109,102 @@ function renderPhysicianReview(review) {
       <div class="review-grid review-grid--stool">${renderReviewRows(review.stool)}</div>
     </section>
 
-    <section class="review-section">
+    <section class="review-section review-section--detail">
       <h3>安全・追加確認</h3>
       <div class="review-grid">${renderReviewRows(review.safety)}</div>
       <div class="review-grid review-grid--compact">${renderReviewRows(review.stoolConcerns)}</div>
     </section>
 
-    <section class="review-section">
+    <section class="review-section review-section--detail">
       <h3>便秘薬</h3>
       <div class="review-grid review-grid--medicine">${renderReviewRows(review.medication)}</div>
     </section>
+
+    ${
+      review.diary.length
+        ? `
+          <section class="review-section review-section--detail">
+            <h3>直近日誌</h3>
+            <ul class="weekly-summary">${renderReviewList(review.weeklySummary)}</ul>
+            <div class="review-grid review-grid--diary">${renderReviewRows(review.diary)}</div>
+          </section>
+        `
+        : ""
+    }
 
     <section class="review-section">
       <h3>診察で見るポイント</h3>
       <ul class="review-list">${renderReviewList(review.checkItems)}</ul>
     </section>
 
-    <section class="review-section review-section--muted">
+    <section class="review-section review-section--muted review-section--detail">
       <h3>AIが判断していないこと</h3>
       <p>${escapeHtml(review.notJudged.join(" / "))}</p>
     </section>
   `;
 }
 
+function renderDiaryField(id, label, suffix) {
+  const value = state.diary[id] ?? "";
+  return `
+    <label class="diary-field">
+      <span>${escapeHtml(label)}</span>
+      <span class="diary-field__control">
+        <input class="diary-input" type="number" min="0" max="31" inputmode="numeric" data-diary-id="${escapeHtml(id)}" value="${escapeHtml(value)}" />
+        <span>${escapeHtml(suffix)}</span>
+      </span>
+    </label>
+  `;
+}
+
+function renderDiaryForm() {
+  return `
+    <section class="diary-link" aria-label="直近日誌">
+      <div class="diary-link__header">
+        <h2>直近日誌がある場合</h2>
+        <p>空欄のままでも送信できます。入力した内容だけ診察前サマリーに追加します。</p>
+      </div>
+      <div class="diary-grid">
+        ${renderDiaryField("diary_days_recorded", "記録日数", "日")}
+        ${renderDiaryField("diary_bowel_days", "排便あり", "日")}
+        ${renderDiaryField("diary_longest_no_bowel_days", "最長無排便", "日")}
+        ${renderDiaryField("diary_hard_days", "硬い便", "日")}
+        ${renderDiaryField("diary_pain_days", "痛み", "日")}
+        ${renderDiaryField("diary_med_taken_days", "内服できた日", "日")}
+      </div>
+      <label class="diary-note">
+        <span>日誌メモ</span>
+        <textarea id="diaryNoteInput" class="text-input text-input--compact" maxlength="200" placeholder="例: 園では出にくい、薬は朝だけ残ることがある">${escapeHtml(state.diary.diary_note || "")}</textarea>
+      </label>
+    </section>
+  `;
+}
+
+function wireDiaryForm() {
+  document.querySelectorAll("[data-diary-id]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.diary[input.dataset.diaryId] = input.value;
+    });
+  });
+  const note = document.getElementById("diaryNoteInput");
+  if (note) {
+    note.addEventListener("input", () => {
+      state.diary.diary_note = note.value;
+    });
+  }
+}
+
+function updateDashboardMode() {
+  const compact = state.dashboardMode === "compact";
+  els.doctorPanel.classList.toggle("is-compact", compact);
+  els.toggleDashboardModeButton.textContent = compact ? "詳細表示" : "簡略表示";
+  els.toggleDashboardModeButton.setAttribute("aria-pressed", String(compact));
+}
+
 function renderIntro() {
   els.progress.hidden = true;
   els.nav.hidden = true;
-  els.doctorPanel.hidden = true;
+  setDoctorPanelVisible(false);
   els.screen.innerHTML = `
     <div class="intro">
       <h1>うんちの様子を教えてください</h1>
@@ -187,7 +283,7 @@ function renderQuestion() {
 
   els.progress.hidden = false;
   els.nav.hidden = false;
-  els.doctorPanel.hidden = true;
+  setDoctorPanelVisible(false);
   updateProgress(flow);
 
   els.screen.innerHTML = `
@@ -264,40 +360,65 @@ function renderFinish() {
   els.backButton.disabled = false;
   els.nextButton.textContent = "送信する";
   els.nextButton.disabled = false;
-  els.doctorPanel.hidden = true;
+  setDoctorPanelVisible(false);
   els.screen.innerHTML = `
     <div class="finish">
       <h1>入力ありがとうございました</h1>
       <p>回答内容を診察前の確認用にまとめます。</p>
       ${safe ? `<div class="notice">${SAFETY_TEXT}</div>` : ""}
       <p>薬の量や治療方針は、診察で医師が確認します。</p>
+      ${renderDiaryForm()}
     </div>
   `;
+  wireDiaryForm();
+}
+
+function buildPayload() {
+  return mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(state.answers), normalizeDiaryAnswers(state.diary)), {
+    ...visitMetaFromUrl,
+    submitted_at: new Date().toISOString(),
+  });
 }
 
 function renderSubmitted() {
-  const payload = pruneHiddenAnswers(state.answers);
+  const payload = buildPayload();
   const review = generatePhysicianReview(payload);
+  const patientMemo = generatePatientMemo(payload);
   els.progress.hidden = true;
   els.nav.hidden = true;
-  els.doctorPanel.hidden = false;
+  setDoctorPanelVisible(isStaffMode);
+  updateDashboardMode();
   els.screen.innerHTML = `
     <div class="finish">
       <h1>送信内容を作成しました</h1>
-      <p>このミニサマリーは、診察前に医師または医療スタッフが確認するためのものです。ChatGPTなどに追加で判断を聞くための文章ではありません。</p>
-      <p>右側または下部に、診察前確認用のダッシュボードと院内システム連携用のJSONを表示しています。</p>
+      <p>入力内容は診察前確認のために使います。薬の量や治療方針は診察で医師が確認します。</p>
+      ${isStaffMode ? `<p>医療者確認用のダッシュボードを表示しています。院内システム連携用のJSONは必要時に開けます。</p>` : ""}
       ${hasSafetyNotice(payload) ? `<div class="notice">${SAFETY_TEXT}</div>` : ""}
+      <section class="patient-memo">
+        <div class="patient-memo__header">
+          <h2>患者用メモ</h2>
+          <button id="copyPatientMemoButton" class="button button--secondary button--small" type="button">メモコピー</button>
+        </div>
+        <p>このメモは、あとで相談内容を思い出すためのものです。薬の量を決めるものではありません。</p>
+        <pre class="patient-memo__preview">${escapeHtml(patientMemo)}</pre>
+      </section>
       <button id="restartButton" class="button button--secondary" type="button">最初から入力</button>
     </div>
   `;
   els.summaryOutput.innerHTML = renderPhysicianReview(review);
   els.summaryOutput.dataset.copyText = generateSummary(payload);
+  els.summaryOutput.dataset.facilityShareText = generateFacilityShare(payload);
   els.jsonOutput.textContent = JSON.stringify(payload, null, 2);
+  document.getElementById("copyPatientMemoButton").addEventListener("click", async (event) => {
+    await copyText(event.currentTarget, patientMemo, "メモコピー");
+  });
   document.getElementById("restartButton").addEventListener("click", () => {
     state.started = false;
     state.index = 0;
     state.answers = {};
+    state.diary = {};
     state.submitted = false;
+    state.dashboardMode = "full";
     render();
   });
 }
@@ -340,12 +461,33 @@ function render() {
 
 els.nextButton.addEventListener("click", goNext);
 els.backButton.addEventListener("click", goBack);
-els.copySummaryButton.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(els.summaryOutput.dataset.copyText || els.summaryOutput.textContent);
-  els.copySummaryButton.textContent = "コピー済み";
+els.toggleDashboardModeButton.addEventListener("click", () => {
+  state.dashboardMode = state.dashboardMode === "compact" ? "full" : "compact";
+  updateDashboardMode();
+});
+
+async function copyText(button, text, defaultLabel) {
+  await navigator.clipboard.writeText(text);
+  button.textContent = "コピー済み";
   setTimeout(() => {
-    els.copySummaryButton.textContent = "コピー";
+    button.textContent = defaultLabel;
   }, 1200);
+}
+
+els.copySummaryButton.addEventListener("click", async () => {
+  await copyText(els.copySummaryButton, els.summaryOutput.dataset.copyText || els.summaryOutput.textContent, "サマリーコピー");
+});
+
+els.copyFacilityShareButton.addEventListener("click", async () => {
+  await copyText(els.copyFacilityShareButton, els.summaryOutput.dataset.facilityShareText || els.summaryOutput.textContent, "院内共有コピー");
+});
+
+els.copyJsonButton.addEventListener("click", async (event) => {
+  await copyText(els.copyJsonButton, els.jsonOutput.textContent, "JSONコピー");
+});
+
+els.printPdfButton.addEventListener("click", () => {
+  window.print();
 });
 
 render();

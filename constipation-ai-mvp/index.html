@@ -28,11 +28,24 @@
       <aside id="doctorPanel" class="doctor-panel" hidden>
         <div class="doctor-panel__header">
           <h2>診察支援ダッシュボード</h2>
-          <button id="copySummaryButton" class="button button--secondary button--small" type="button">コピー</button>
+          <div class="doctor-panel__actions">
+            <button id="toggleDashboardModeButton" class="button button--secondary button--small" type="button" aria-pressed="false">簡略表示</button>
+            <button id="copySummaryButton" class="button button--secondary button--small" type="button">サマリーコピー</button>
+            <button id="copyFacilityShareButton" class="button button--secondary button--small" type="button">院内共有コピー</button>
+            <button id="printPdfButton" class="button button--secondary button--small" type="button">PDF/印刷</button>
+          </div>
         </div>
         <div id="summaryOutput" class="review-dashboard"></div>
-        <h3>送信JSON</h3>
-        <pre id="jsonOutput"></pre>
+        <div class="json-block">
+          <div class="json-block__header">
+            <span>送信JSON</span>
+            <button id="copyJsonButton" class="button button--secondary button--small" type="button">JSONコピー</button>
+          </div>
+          <details class="json-details">
+            <summary>開く</summary>
+            <pre id="jsonOutput"></pre>
+          </details>
+        </div>
       </aside>
     </main>
 

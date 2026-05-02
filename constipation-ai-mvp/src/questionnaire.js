@@ -159,12 +159,25 @@
     "q14_change_after_less_med",
   ];
 
+  const DIARY_FIELD_IDS = [
+    "diary_days_recorded",
+    "diary_bowel_days",
+    "diary_longest_no_bowel_days",
+    "diary_hard_days",
+    "diary_pain_days",
+    "diary_med_taken_days",
+    "diary_note",
+  ];
+
+  const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at"];
+
   function asArray(value) {
     return Array.isArray(value) ? value : [];
   }
 
   function flags(data) {
-    const adherence = asArray(data.q6_med_adherence_flags);
+    const canUseAdherence = data.q6_med_status && data.q6_med_status !== "便秘のお薬は使っていない" && data.q6_med_status !== UNKNOWN;
+    const adherence = canUseAdherence ? asArray(data.q6_med_adherence_flags) : [];
     return {
       fourDays: data.q1_last_bowel_movement === "4日以上前" || data.q2_bowel_frequency === "4日以上あくことがある",
       watery: data.q3_stool_consistency === "水のよう",
@@ -208,6 +221,52 @@
       if (visible.has(id) && data[id] !== undefined) next[id] = data[id];
     });
     return next;
+  }
+
+  function normalizeDiaryAnswers(input) {
+    const next = {};
+    const numericIds = DIARY_FIELD_IDS.filter((id) => id !== "diary_note");
+    numericIds.forEach((id) => {
+      if (input[id] === undefined || input[id] === "") return;
+      const value = Number.parseInt(input[id], 10);
+      if (Number.isFinite(value) && value >= 0) next[id] = value;
+    });
+    if (input.diary_note !== undefined) {
+      const note = String(input.diary_note).trim();
+      if (note) next.diary_note = note.slice(0, 200);
+    }
+    return next;
+  }
+
+  function mergeDiaryAnswers(base, diary) {
+    return { ...base, ...normalizeDiaryAnswers(diary || {}) };
+  }
+
+  function normalizeVisitMeta(input) {
+    const meta = {};
+    const patientId = String(input.patient_id || "").replace(/\D/g, "").slice(0, 5);
+    const visitToken = String(input.visit_token || "")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .slice(0, 12)
+      .toUpperCase();
+    const submittedAt = input.submitted_at ? String(input.submitted_at) : "";
+    const visitId = String(input.visit_id || "")
+      .replace(/[^A-Za-z0-9_-]/g, "")
+      .slice(0, 40);
+
+    if (patientId) meta.patient_id = patientId;
+    if (visitToken) meta.visit_token = visitToken;
+    if (submittedAt) meta.submitted_at = submittedAt;
+    if (visitId) {
+      meta.visit_id = visitId;
+    } else if (patientId && visitToken && submittedAt) {
+      meta.visit_id = `${submittedAt.slice(0, 10).replaceAll("-", "")}-${patientId}-${visitToken}`;
+    }
+    return meta;
+  }
+
+  function mergeVisitMeta(base, meta) {
+    return { ...base, ...normalizeVisitMeta(meta || {}) };
   }
 
   function normalizeMultiSelection(fieldId, current, clicked) {
@@ -275,7 +334,7 @@
 
   function medChangeValue(data) {
     if (data.q6_med_status === "便秘のお薬は使っていない") return "該当なし";
-    if (!flags(data).medLessForgotStopped) return flags(data).medDifficulty ? "未確認" : "該当なし";
+    if (!flags(data).medLessForgotStopped) return "該当なし";
     return data.q14_change_after_less_med !== undefined ? displayValue(data, "q14_change_after_less_med") : "未確認";
   }
 
@@ -290,14 +349,16 @@
     return withOther.length ? withOther.join("、") : "未確認";
   }
 
+  function staffShareConcerns(data) {
+    const concerns = [];
+    if (data.q9_abdominal_symptom === "強い") concerns.push("強い腹痛・お腹の張り");
+    if (data.q10_vomiting === "ある") concerns.push("嘔吐");
+    if (data.q11_appetite_mood === "食欲も機嫌も気になる") concerns.push("食欲と機嫌の変化");
+    return concerns;
+  }
+
   function hasSafetyNotice(data) {
-    return (
-      data.q9_abdominal_symptom === "強い" ||
-      data.q10_vomiting === "ある" ||
-      data.q11_appetite_mood === "食欲が少ない" ||
-      data.q11_appetite_mood === "機嫌が悪い" ||
-      data.q11_appetite_mood === "食欲も機嫌も気になる"
-    );
+    return staffShareConcerns(data).length > 0;
   }
 
   function aiFollowUpItems(data) {
@@ -320,20 +381,22 @@
       items.push("食欲・機嫌の変化があります。");
     }
     if (f.medLessForgotStopped) {
-      items.push("実際のお薬が少なめ、飲み忘れ、または中止中。以後の硬さ、間隔、痛みの変化を確認。");
+      items.push(medWorseningPhrase(data) || "実際のお薬が少なめ、飲み忘れ、または中止中。以後の硬さ、間隔、痛みの変化を確認。");
       if (data.q6_med_status === "調節してよいと言われたが、最近は少なめになっている") {
-        items.push("処方量の変更や調節範囲の確認は医師判断です。");
+        items.push("処方量の変更や調節範囲は、この画面では判断せず診察で確認します。");
       }
     }
     if (f.medDifficulty) {
       items.push("お薬が飲みにくい可能性あり。味、量、タイミング、子どもの拒否など具体的な理由を確認。");
     }
     if (f.fourDays && f.hardPainWithholding) {
-      items.push("便塞栓の有無や追加対応は医師診察で確認が必要です。");
+      items.push("便塞栓の有無や追加対応は、この画面では判断せず診察で確認します。");
     }
     if (hasSafetyNotice(data)) {
-      items.push("強い腹痛・お腹の張り、嘔吐、食欲・機嫌の変化があります。入力だけでなく受付または医療スタッフにも伝える必要があります。");
+      items.push(`${staffShareConcerns(data).join("、")}があります。受付または医療スタッフにも共有する項目です。`);
     }
+    const diaryItems = diaryFollowUpItems(data);
+    items.push(...diaryItems);
     const unknownCount = BASIC_IDS.filter((id) => data[id] === UNKNOWN).length;
     if (!items.length && unknownCount >= 3) {
       items.push("保護者がわからないと回答した項目が複数あります。診察で確認できる範囲を確認。");
@@ -342,18 +405,153 @@
     return items;
   }
 
+  function diaryFollowUpItems(data) {
+    if (!hasDiaryData(data)) return [];
+    const items = [];
+    if (data.diary_longest_no_bowel_days >= 4) {
+      items.push(`直近日誌で最長${data.diary_longest_no_bowel_days}日の無排便があります。問診回答とあわせて診察で確認。`);
+    }
+    const symptomParts = [];
+    if (data.diary_hard_days > 0) symptomParts.push(`硬い便${data.diary_hard_days}日`);
+    if (data.diary_pain_days > 0) symptomParts.push(`痛み${data.diary_pain_days}日`);
+    if (symptomParts.length) {
+      items.push(`直近日誌に${symptomParts.join("、")}があります。便の硬さ、痛み、がまんの流れを確認。`);
+    }
+    if (data.diary_med_taken_days !== undefined && data.diary_days_recorded !== undefined && data.diary_med_taken_days < data.diary_days_recorded) {
+      items.push(`直近日誌で内服できた日は${data.diary_med_taken_days}/${data.diary_days_recorded}日です。飲めなかった理由を確認。`);
+    }
+    if (!items.length) items.push("直近日誌メモがあります。問診回答とあわせて診察で確認。");
+    return items;
+  }
+
+  function hasDiaryData(data) {
+    return DIARY_FIELD_IDS.some((id) => data[id] !== undefined && data[id] !== "");
+  }
+
+  function diaryRows(data) {
+    if (!hasDiaryData(data)) return [];
+    return [
+      { label: "記録日数", value: data.diary_days_recorded !== undefined ? `${data.diary_days_recorded}日` : "未確認" },
+      { label: "排便あり", value: data.diary_bowel_days !== undefined ? `${data.diary_bowel_days}日` : "未確認" },
+      { label: "最長無排便", value: data.diary_longest_no_bowel_days !== undefined ? `${data.diary_longest_no_bowel_days}日` : "未確認" },
+      { label: "硬い便", value: data.diary_hard_days !== undefined ? `${data.diary_hard_days}日` : "未確認" },
+      { label: "痛み", value: data.diary_pain_days !== undefined ? `${data.diary_pain_days}日` : "未確認" },
+      { label: "内服できた日", value: data.diary_med_taken_days !== undefined ? `${data.diary_med_taken_days}日` : "未確認" },
+      { label: "日誌メモ", value: data.diary_note || "なし" },
+    ];
+  }
+
+  function diarySummaryText(data) {
+    const rows = diaryRows(data);
+    if (!rows.length) return "- なし";
+    return rows.map((item) => `- ${item.label}: ${item.value}`).join("\n");
+  }
+
+  function weeklySummary(data) {
+    if (!hasDiaryData(data)) return [];
+    const days = data.diary_days_recorded;
+    const period = days !== undefined ? `${days}日間` : "直近日誌";
+    const items = [];
+
+    if (data.diary_bowel_days !== undefined) {
+      items.push(`${period}で排便あり${data.diary_bowel_days}${days !== undefined ? `/${days}` : ""}日`);
+    }
+    if (data.diary_longest_no_bowel_days !== undefined) {
+      items.push(`最長無排便${data.diary_longest_no_bowel_days}日`);
+    }
+    if (data.diary_hard_days !== undefined || data.diary_pain_days !== undefined) {
+      const hard = data.diary_hard_days !== undefined ? `硬い便${data.diary_hard_days}日` : "硬い便未確認";
+      const pain = data.diary_pain_days !== undefined ? `痛み${data.diary_pain_days}日` : "痛み未確認";
+      items.push(`${hard}、${pain}`);
+    }
+    if (data.diary_med_taken_days !== undefined) {
+      items.push(`内服できた日${data.diary_med_taken_days}${days !== undefined ? `/${days}` : ""}日`);
+    }
+    if (!items.length && data.diary_note) {
+      items.push("日誌メモのみ記録あり");
+    }
+    return items;
+  }
+
+  function weeklySummaryText(data) {
+    const items = weeklySummary(data);
+    if (!items.length) return "- なし";
+    return items.map((item) => `- ${item}`).join("\n");
+  }
+
   function primaryConcern(data) {
     const f = flags(data);
+    const safety = hasSafetyNotice(data);
+    const safetyConcerns = staffShareConcerns(data);
+    const stoolConcerns = buildStoolConcernPhrases(data);
+    const medicineConcerns = buildMedicineConcernPhrases(data);
+    const bodyConcerns = [...stoolConcerns, ...medicineConcerns];
+
+    if (safety) {
+      const body = bodyConcerns.length ? `${bodyConcerns.join("。")}。` : "追加で確認されています。";
+      return `${safetyConcerns.join("、")}があります。${body}`;
+    }
+    if (stoolConcerns.length && medicineConcerns.length) {
+      return `${stoolConcerns.join("。")}。${medicineConcerns.join("。")}。`;
+    }
+    if (stoolConcerns.length) {
+      return `${stoolConcerns.join("。")}。`;
+    }
+    if (medicineConcerns.length) {
+      return `${medicineConcerns.join("。")}。`;
+    }
+    return "今回の回答では、目立つ追加確認項目はありません。";
+  }
+
+  function buildStoolConcernPhrases(data) {
+    const f = flags(data);
     const concerns = [];
-    if (hasSafetyNotice(data)) concerns.push("安全確認あり");
-    if (f.fourDays) concerns.push("4日以上無排便/間隔あり");
-    if (f.watery) concerns.push("水様便");
-    if (data.q3_stool_consistency === "硬い") concerns.push("硬便");
-    if (data.q4_pain === "強く痛がる" || data.q4_pain === "泣く、またはとても嫌がる") concerns.push("強い排便時痛");
-    if (data.q5_withholding === "ある" || data.q5_withholding === "強くある") concerns.push("がまん");
-    if (f.medLessForgotStopped) concerns.push("内服少なめ/忘れ/中止");
-    if (f.medDifficulty) concerns.push("内服困難");
-    return concerns.length ? concerns.join(" + ") : "目立つ追加確認なし";
+    if (f.fourDays) {
+      concerns.push("4日以上の無排便または排便間隔のあきがあります");
+    } else if (f.watery) {
+      concerns.push("水のような便があります");
+    }
+
+    const hardPainWithholding = [];
+    if (data.q3_stool_consistency === "硬い") hardPainWithholding.push("硬い便");
+    if (data.q4_pain === "強く痛がる" || data.q4_pain === "泣く、またはとても嫌がる") hardPainWithholding.push("強い排便時痛");
+    if (data.q5_withholding === "ある" || data.q5_withholding === "強くある") hardPainWithholding.push("がまん行動");
+    if (hardPainWithholding.length) {
+      concerns.push(`${hardPainWithholding.join("・")}が確認されています`);
+    }
+    return concerns;
+  }
+
+  function buildMedicineConcernPhrases(data) {
+    const concerns = medicineConcernLabels(data);
+    if (!concerns.length) return [];
+    const worsening = medWorseningPhrase(data);
+    return [`便秘薬では${concerns.join("、")}が確認されています${worsening ? `。${worsening}` : ""}`];
+  }
+
+  function medicineConcernLabels(data) {
+    const adherence = asArray(data.q6_med_adherence_flags);
+    const concerns = [];
+    if (data.q6_med_status === "調節してよいと言われたが、最近は少なめになっている") concerns.push("最近少なめ");
+    if (data.q6_med_status === "ときどき忘れる" || adherence.includes("ときどき忘れる")) concerns.push("飲み忘れ");
+    if (data.q6_med_status === "今は中止している") concerns.push("中止中");
+    if (data.q6_med_status === "飲みにくくて残る" || adherence.includes("飲みにくくて残る")) concerns.push("飲みにくさ");
+    return concerns;
+  }
+
+  function medWorseningPhrase(data) {
+    const changes = medSpecificWorseningLabels(data);
+    if (!changes.length) return "";
+    return `薬が少なめ・飲み忘れ・中止のあとに${changes.join("、")}があります`;
+  }
+
+  function medSpecificWorseningLabels(data) {
+    const values = asArray(data.q14_change_after_less_med);
+    const labels = [];
+    if (values.includes("硬くなった")) labels.push("硬便化");
+    if (values.includes("出る間隔があいた")) labels.push("排便間隔延長");
+    if (values.includes("痛がるようになった")) labels.push("排便時痛の変化");
+    return labels;
   }
 
   function reviewUrgency(data) {
@@ -362,25 +560,25 @@
       return {
         level: "alert",
         label: "受付・スタッフ共有",
-        message: "強い腹痛・嘔吐・食欲/機嫌変化のいずれかがあります。",
+        message: "受付・スタッフ共有の表示対象となる体調変化が含まれます。",
       };
     }
     if (f.fourDays || f.watery || f.hardPainWithholding || f.medLessForgotStopped || f.medDifficulty) {
       return {
         level: "watch",
         label: "診察で確認",
-        message: "回答に応じた追加確認項目があります。",
+        message: "診察時に確認したい追加情報があります。",
       };
     }
     return {
       level: "stable",
       label: "通常確認",
-      message: "現時点で強い安全表示はありません。",
+      message: "現時点で受付・スタッフ共有の表示対象はありません。",
     };
   }
 
   function generatePhysicianReview(input) {
-    const data = pruneHiddenAnswers(input);
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
     const followUps = aiFollowUpItems(data);
     return {
       urgency: reviewUrgency(data),
@@ -407,6 +605,8 @@
         { label: "少なめ/忘れ/中止後", value: medChangeValue(data) },
         { label: "飲みにくさ", value: medDifficultyValue(data) },
       ],
+      diary: diaryRows(data),
+      weeklySummary: weeklySummary(data),
       checkItems: followUps.slice(0, 4),
       notJudged: ["診断", "便塞栓の有無", "処方量変更", "治療中止可否", "専門紹介の要否"],
       raw: data,
@@ -414,7 +614,7 @@
   }
 
   function generateSummary(input) {
-    const data = pruneHiddenAnswers(input);
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
     const followUps = aiFollowUpItems(data).map((item) => `- ${item}`).join("\n");
     return `【診察前 便秘ミニサマリー】
 
@@ -429,6 +629,12 @@
 - 補足: ${medicineSupplement(data)}
 - 少なめ・飲み忘れ・中止後の変化: ${medChangeValue(data)}
 - 飲みにくさ: ${medDifficultyValue(data)}
+
+直近日誌:
+${diarySummaryText(data)}
+
+週次サマリー:
+${weeklySummaryText(data)}
 
 追加確認:
 - お腹の張り・腹痛: ${displayValue(data, "q9_abdominal_symptom")}
@@ -446,6 +652,56 @@ AIが判断していないこと:
 - モビコールなどの処方量変更
 - 治療中止可否
 - 専門紹介の要否`;
+  }
+
+  function generateFacilityShare(input) {
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    const review = generatePhysicianReview(data);
+    return `【院内共有用 便秘問診】
+
+確認区分: ${review.urgency.label}
+概要: ${review.headline}
+
+診察で見るポイント:
+${review.checkItems.map((item) => `- ${item}`).join("\n")}
+
+AIが判断していないこと:
+- ${review.notJudged.join("\n- ")}
+
+送信JSON:
+${JSON.stringify(data, null, 2)}`;
+  }
+
+  function generatePatientMemo(input) {
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    const diaryText = weeklySummary(data);
+    const diarySection = diaryText.length
+      ? `
+最近の記録:
+${diaryText.map((item) => `- ${item}`).join("\n")}
+`
+      : "";
+
+    return `【便秘メモ】
+
+今日のうんちの様子:
+- 最後のうんち: ${displayValue(data, "q1_last_bowel_movement")}
+- うんちの間隔: ${displayValue(data, "q2_bowel_frequency")}
+- うんちの硬さ: ${displayValue(data, "q3_stool_consistency")}
+- うんちのときの痛み: ${displayValue(data, "q4_pain")}
+- がまんする様子: ${displayValue(data, "q5_withholding")}
+
+お薬:
+- 今の飲み方: ${medicineStatus(data)}
+- 飲みにくさなど: ${medicineSupplement(data)}
+${diarySection}
+次に相談すること:
+- お薬を続けるか、減らすか、やめるかは診察で相談します。
+- 不安で自己判断しそうなときは、このメモと日誌を見て、相談したいことを整理します。
+
+大事なこと:
+- このメモでは薬の量を決めません。
+- 薬を増やす、減らす、やめる、再開する判断は医師と相談します。`;
   }
 
   function branchMessage(fieldId, data) {
@@ -471,15 +727,24 @@ AIが判断していないこと:
     FIELDS,
     BASIC_IDS,
     ADDITIONAL_ORDER,
+    DIARY_FIELD_IDS,
+    VISIT_META_FIELD_IDS,
     flags,
     shouldShowMedAdherence,
     visibleFieldIds,
     pruneHiddenAnswers,
+    normalizeDiaryAnswers,
+    mergeDiaryAnswers,
+    normalizeVisitMeta,
+    mergeVisitMeta,
+    weeklySummary,
     normalizeMultiSelection,
     hasSafetyNotice,
     aiFollowUpItems,
     generatePhysicianReview,
     generateSummary,
+    generateFacilityShare,
+    generatePatientMemo,
     branchMessage,
   };
 });

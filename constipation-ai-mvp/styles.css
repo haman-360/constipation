@@ -30,7 +30,8 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input {
   font: inherit;
 }
 
@@ -41,6 +42,11 @@ textarea {
   width: min(1180px, calc(100% - 32px));
   margin: 32px auto;
   align-items: start;
+}
+
+.app-shell--patient-only {
+  grid-template-columns: minmax(300px, 640px);
+  justify-content: center;
 }
 
 .panel,
@@ -63,10 +69,28 @@ textarea {
 
 .doctor-panel__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.doctor-panel__header h2 {
+  flex: 1 1 220px;
+  min-width: 180px;
+  margin-bottom: 0;
+  line-height: 1.35;
+}
+
+.doctor-panel__actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
 }
 
 h1,
@@ -194,11 +218,80 @@ h3 {
   border-radius: 8px;
 }
 
+.text-input--compact {
+  min-height: 84px;
+}
+
 .text-input:focus,
+.diary-input:focus,
 .choice:focus-visible,
-.button:focus-visible {
+.button:focus-visible,
+.json-details summary:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+.diary-link {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfe;
+}
+
+.diary-link__header {
+  margin-bottom: 14px;
+}
+
+.diary-link__header h2 {
+  margin-bottom: 4px;
+}
+
+.diary-link__header p {
+  margin-bottom: 0;
+}
+
+.diary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.diary-field,
+.diary-note {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.diary-field {
+  padding: 10px;
+  border: 1px solid #e5ebf1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.diary-field__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.diary-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.diary-note {
+  margin-top: 12px;
 }
 
 .field-error {
@@ -251,6 +344,12 @@ h3 {
   font-size: 0.9rem;
 }
 
+.doctor-panel__header .button,
+.json-block .button {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
 .notice {
   margin: 18px 0;
   padding: 14px 16px;
@@ -260,6 +359,33 @@ h3 {
   color: var(--warn);
   line-height: 1.6;
   font-weight: 700;
+}
+
+.patient-memo {
+  margin: 22px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfe;
+}
+
+.patient-memo__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.patient-memo__header h2 {
+  margin-bottom: 0;
+}
+
+.patient-memo__preview {
+  max-height: 220px;
+  margin-top: 12px;
+  background: #fff;
 }
 
 pre {
@@ -275,6 +401,45 @@ pre {
   line-height: 1.55;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.86rem;
+}
+
+.json-block {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.json-block__header {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.json-details {
+  border-top: 1px solid var(--line);
+}
+
+.json-details summary {
+  min-height: 44px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 800;
+  list-style-position: outside;
+}
+
+.json-details pre {
+  max-height: 36vh;
+  border-width: 1px 0 0;
+  border-radius: 0;
 }
 
 .review-dashboard {
@@ -344,6 +509,11 @@ pre {
   background: #f8fafb;
 }
 
+.doctor-panel.is-compact .review-section--detail,
+.doctor-panel.is-compact .json-block {
+  display: none;
+}
+
 .review-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -364,6 +534,10 @@ pre {
 
 .review-grid--medicine {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.review-grid--diary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .review-row {
@@ -400,14 +574,55 @@ pre {
   margin-top: 6px;
 }
 
+.weekly-summary {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.weekly-summary li {
+  padding: 8px 10px;
+  border: 1px solid #e5ebf1;
+  border-radius: 8px;
+  background: #f8fafb;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
 @media (max-width: 920px) {
   .app-shell {
     grid-template-columns: 1fr;
-    margin: 16px auto;
+    gap: 16px;
+    width: min(100%, 720px);
+    margin: 0 auto;
+    padding: 12px;
+  }
+
+  .panel,
+  .doctor-panel {
+    border-radius: 8px;
+    box-shadow: 0 8px 22px rgba(32, 36, 42, 0.06);
   }
 
   .panel {
-    min-height: calc(100vh - 32px);
+    min-height: calc(100dvh - 24px);
+  }
+
+  .doctor-panel {
+    padding: 14px;
+  }
+
+  .doctor-panel__header {
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+
+  .doctor-panel__actions {
+    align-items: stretch;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .intro,
@@ -420,10 +635,204 @@ pre {
     font-size: 1.72rem;
   }
 
+  .question__title {
+    font-size: 1.35rem;
+  }
+
+  .choice {
+    min-height: 52px;
+  }
+
+  .nav {
+    padding: 14px 16px;
+  }
+
+  .nav .button {
+    flex: 1 1 0;
+  }
+
+  .button--small {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .review-dashboard {
+    gap: 10px;
+  }
+
+  .review-hero {
+    padding: 14px;
+  }
+
+  .review-hero h2 {
+    font-size: 1.08rem;
+  }
+
+  .review-section {
+    padding: 12px;
+  }
+
   .review-grid,
   .review-grid--stool,
   .review-grid--compact,
-  .review-grid--medicine {
+  .review-grid--medicine,
+  .review-grid--diary,
+  .diary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .review-row {
+    min-height: auto;
+  }
+
+  .json-block__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .json-block__header .button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-shell {
+    padding: 8px;
+  }
+
+  .panel,
+  .doctor-panel {
+    border-radius: 6px;
+  }
+
+  .intro,
+  .question,
+  .finish {
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.55rem;
+  }
+
+  .question__title {
+    font-size: 1.25rem;
+  }
+
+  .doctor-panel__header {
+    display: grid;
+    gap: 10px;
+  }
+
+  .doctor-panel__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .doctor-panel__header .button {
+    width: 100%;
+  }
+
+  .review-list {
+    padding-left: 18px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body {
+    min-height: auto;
+    background: #fff;
+    color: #000;
+  }
+
+  .app-shell {
+    display: block;
+    width: 100%;
+    margin: 0;
+  }
+
+  .panel,
+  .doctor-panel__actions,
+  .json-block {
+    display: none !important;
+  }
+
+  .doctor-panel {
+    display: block !important;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .doctor-panel__header {
+    display: block;
+    margin-bottom: 8mm;
+  }
+
+  .doctor-panel__header h2 {
+    margin: 0;
+    color: #000;
+    font-size: 14pt;
+  }
+
+  .review-dashboard {
+    display: block;
+  }
+
+  .review-hero,
+  .review-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 5mm;
+    border-color: #b8c0ca;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .review-hero {
+    padding: 5mm;
+    border-left-width: 4mm;
+  }
+
+  .review-section {
+    padding: 4mm;
+  }
+
+  .review-hero h2 {
+    font-size: 13pt;
+  }
+
+  .review-hero__label,
+  .review-section h3 {
+    color: #333;
+  }
+
+  .review-hero p:last-child,
+  .review-section p,
+  .review-list {
+    color: #111;
+  }
+
+  .review-row {
+    min-height: 0;
+    border-color: #cfd6df;
+    background: #fff;
+  }
+
+  .review-grid,
+  .review-grid--stool {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .review-grid--compact,
+  .review-grid--medicine,
+  .review-grid--diary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

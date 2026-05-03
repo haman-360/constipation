@@ -32,7 +32,7 @@
       help: "いつも同じでない場合は、気になるものを選んでください。",
       type: "single",
       required: true,
-      options: ["硬い", "普通", "やわらかい", "水のよう", UNKNOWN],
+      options: ["硬い", "普通（バナナくらい）", "やわらかい", "水のよう（下痢に近い）", UNKNOWN],
       group: "basic",
     },
     q4_pain: {
@@ -171,8 +171,37 @@
 
   const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at"];
 
+  const QUESTIONNAIRE_FIELD_IDS = [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER];
+
+  const SHORT_QR_FIELD_ALIASES = {
+    q1: "q1_last_bowel_movement",
+    q2: "q2_bowel_frequency",
+    q3: "q3_stool_consistency",
+    q4: "q4_pain",
+    q5: "q5_withholding",
+    q6: "q6_med_status",
+    q6a: "q6_med_adherence_flags",
+    q7: "q7_blood",
+    q8: "q8_soiling",
+    q9: "q9_abdominal_symptom",
+    q10: "q10_vomiting",
+    q11: "q11_appetite_mood",
+    q13: "q13_med_difficulty_reason",
+    q14: "q14_change_after_less_med",
+  };
+
+  const SHORT_QR_DIARY_IDS = DIARY_FIELD_IDS.filter((id) => id !== "diary_note");
+
   function asArray(value) {
     return Array.isArray(value) ? value : [];
+  }
+
+  function isHardStool(value) {
+    return value === "硬い";
+  }
+
+  function isWateryStool(value) {
+    return value === "水のよう" || value === "水のよう（下痢に近い）";
   }
 
   function flags(data) {
@@ -180,9 +209,9 @@
     const adherence = canUseAdherence ? asArray(data.q6_med_adherence_flags) : [];
     return {
       fourDays: data.q1_last_bowel_movement === "4日以上前" || data.q2_bowel_frequency === "4日以上あくことがある",
-      watery: data.q3_stool_consistency === "水のよう",
+      watery: isWateryStool(data.q3_stool_consistency),
       hardPainWithholding:
-        data.q3_stool_consistency === "硬い" ||
+        isHardStool(data.q3_stool_consistency) ||
         data.q4_pain === "強く痛がる" ||
         data.q4_pain === "泣く、またはとても嫌がる" ||
         data.q5_withholding === "ある" ||
@@ -358,7 +387,7 @@
   }
 
   function hasSafetyNotice(data) {
-    return staffShareConcerns(data).length > 0;
+    return false;
   }
 
   function aiFollowUpItems(data) {
@@ -372,7 +401,7 @@
     }
     if (f.hardPainWithholding) {
       const reasons = [];
-      if (data.q3_stool_consistency === "硬い") reasons.push("硬い便");
+      if (isHardStool(data.q3_stool_consistency)) reasons.push("硬い便");
       if (data.q4_pain === "強く痛がる" || data.q4_pain === "泣く、またはとても嫌がる") reasons.push("強い痛み");
       if (data.q5_withholding === "ある" || data.q5_withholding === "強くある") reasons.push("がまん");
       items.push(`${reasons.join("、")}があるため、出血や便が少しつく様子もあわせて確認。`);
@@ -392,8 +421,9 @@
     if (f.fourDays && f.hardPainWithholding) {
       items.push("便塞栓の有無や追加対応は、この画面では判断せず診察で確認します。");
     }
-    if (hasSafetyNotice(data)) {
-      items.push(`${staffShareConcerns(data).join("、")}があります。受付または医療スタッフにも共有する項目です。`);
+    const conditionConcerns = staffShareConcerns(data);
+    if (conditionConcerns.length) {
+      items.push(`${conditionConcerns.join("、")}があります。診察で確認します。`);
     }
     const diaryItems = diaryFollowUpItems(data);
     items.push(...diaryItems);
@@ -480,26 +510,12 @@
   }
 
   function primaryConcern(data) {
-    const f = flags(data);
-    const safety = hasSafetyNotice(data);
-    const safetyConcerns = staffShareConcerns(data);
+    const conditionConcerns = staffShareConcerns(data).map((item) => `${item}があります`);
     const stoolConcerns = buildStoolConcernPhrases(data);
     const medicineConcerns = buildMedicineConcernPhrases(data);
-    const bodyConcerns = [...stoolConcerns, ...medicineConcerns];
+    const concerns = [...conditionConcerns, ...stoolConcerns, ...medicineConcerns];
 
-    if (safety) {
-      const body = bodyConcerns.length ? `${bodyConcerns.join("。")}。` : "追加で確認されています。";
-      return `${safetyConcerns.join("、")}があります。${body}`;
-    }
-    if (stoolConcerns.length && medicineConcerns.length) {
-      return `${stoolConcerns.join("。")}。${medicineConcerns.join("。")}。`;
-    }
-    if (stoolConcerns.length) {
-      return `${stoolConcerns.join("。")}。`;
-    }
-    if (medicineConcerns.length) {
-      return `${medicineConcerns.join("。")}。`;
-    }
+    if (concerns.length) return `${concerns.join("。")}。`;
     return "今回の回答では、目立つ追加確認項目はありません。";
   }
 
@@ -513,7 +529,7 @@
     }
 
     const hardPainWithholding = [];
-    if (data.q3_stool_consistency === "硬い") hardPainWithholding.push("硬い便");
+    if (isHardStool(data.q3_stool_consistency)) hardPainWithholding.push("硬い便");
     if (data.q4_pain === "強く痛がる" || data.q4_pain === "泣く、またはとても嫌がる") hardPainWithholding.push("強い排便時痛");
     if (data.q5_withholding === "ある" || data.q5_withholding === "強くある") hardPainWithholding.push("がまん行動");
     if (hardPainWithholding.length) {
@@ -556,14 +572,7 @@
 
   function reviewUrgency(data) {
     const f = flags(data);
-    if (hasSafetyNotice(data)) {
-      return {
-        level: "alert",
-        label: "受付・スタッフ共有",
-        message: "受付・スタッフ共有の表示対象となる体調変化が含まれます。",
-      };
-    }
-    if (f.fourDays || f.watery || f.hardPainWithholding || f.medLessForgotStopped || f.medDifficulty) {
+    if (f.fourDays || f.watery || f.hardPainWithholding || f.medLessForgotStopped || f.medDifficulty || staffShareConcerns(data).length) {
       return {
         level: "watch",
         label: "診察で確認",
@@ -573,7 +582,7 @@
     return {
       level: "stable",
       label: "通常確認",
-      message: "現時点で受付・スタッフ共有の表示対象はありません。",
+      message: "現時点で目立つ追加確認項目はありません。",
     };
   }
 
@@ -704,12 +713,112 @@ ${diarySection}
 - 薬を増やす、減らす、やめる、再開する判断は医師と相談します。`;
   }
 
+  function pickDefined(data, ids) {
+    return Object.fromEntries(ids.filter((id) => data[id] !== undefined).map((id) => [id, data[id]]));
+  }
+
+  function generateSheetsVisitPayload(input) {
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    const review = generatePhysicianReview(data);
+    return {
+      patient_id: data.patient_id || "",
+      visit_id: data.visit_id || "",
+      visit_token: data.visit_token || "",
+      submitted_at: data.submitted_at || "",
+      questionnaire: pickDefined(data, QUESTIONNAIRE_FIELD_IDS),
+      diary: pickDefined(data, DIARY_FIELD_IDS),
+      outputs: {
+        urgency_level: review.urgency.level,
+        urgency_label: review.urgency.label,
+        headline: review.headline,
+        check_items: review.checkItems,
+        not_judged: review.notJudged,
+        summary_text: generateSummary(data),
+        facility_share_text: generateFacilityShare(data),
+        patient_memo_text: generatePatientMemo(data),
+      },
+    };
+  }
+
+  function generateShortQrPayload(input) {
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    const parts = ["v1"];
+    if (data.patient_id) parts.push(`pid=${data.patient_id}`);
+    if (data.visit_token) parts.push(`tok=${data.visit_token}`);
+
+    Object.entries(SHORT_QR_FIELD_ALIASES).forEach(([alias, fieldId]) => {
+      const encoded = encodeShortQrAnswer_(FIELDS[fieldId], data[fieldId]);
+      if (encoded !== "") parts.push(`${alias}=${encoded}`);
+    });
+
+    const diaryValues = SHORT_QR_DIARY_IDS.map((id) => (data[id] === undefined ? "" : String(data[id])));
+    if (diaryValues.some((value) => value !== "")) parts.push(`d=${diaryValues.join(",")}`);
+    return parts.join("|");
+  }
+
+  function decodeShortQrPayload(value) {
+    const parts = String(value || "").split("|").filter(Boolean);
+    if (parts.shift() !== "v1") return {};
+    const data = {};
+
+    parts.forEach((part) => {
+      const separator = part.indexOf("=");
+      if (separator === -1) return;
+      const key = part.slice(0, separator);
+      const raw = part.slice(separator + 1);
+      if (key === "pid") data.patient_id = raw.replace(/\D/g, "").slice(0, 5);
+      if (key === "tok") data.visit_token = raw.replace(/[^A-Za-z0-9]/g, "").slice(0, 12).toUpperCase();
+      if (key === "d") decodeShortQrDiary_(data, raw);
+      if (SHORT_QR_FIELD_ALIASES[key]) {
+        const fieldId = SHORT_QR_FIELD_ALIASES[key];
+        const decoded = decodeShortQrAnswer_(FIELDS[fieldId], raw);
+        if (decoded !== undefined) data[fieldId] = decoded;
+      }
+    });
+
+    return mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(data), data), data);
+  }
+
+  function encodeShortQrAnswer_(field, value) {
+    if (!field || value === undefined) return "";
+    if (field.type === "multi") {
+      const indexes = asArray(value)
+        .map((item) => field.options.indexOf(item))
+        .filter((index) => index >= 0);
+      return indexes.length ? indexes.join(".") : "";
+    }
+    const index = field.options.indexOf(value);
+    return index >= 0 ? String(index) : "";
+  }
+
+  function decodeShortQrAnswer_(field, raw) {
+    if (!field || raw === "") return undefined;
+    if (field.type === "multi") {
+      const values = raw
+        .split(".")
+        .map((item) => Number.parseInt(item, 10))
+        .filter((index) => Number.isFinite(index) && field.options[index] !== undefined)
+        .map((index) => field.options[index]);
+      return values.length ? values : undefined;
+    }
+    const index = Number.parseInt(raw, 10);
+    return Number.isFinite(index) ? field.options[index] : undefined;
+  }
+
+  function decodeShortQrDiary_(data, raw) {
+    raw.split(",").forEach((item, index) => {
+      const id = SHORT_QR_DIARY_IDS[index];
+      const value = Number.parseInt(item, 10);
+      if (id && Number.isFinite(value) && value >= 0) data[id] = value;
+    });
+  }
+
   function branchMessage(fieldId, data) {
     const f = flags(data);
     if (["q9_abdominal_symptom", "q10_vomiting", "q11_appetite_mood"].includes(fieldId)) {
       return f.fourDays
         ? "うんちの間隔があいているため、体調について少し確認します。"
-        : "水のようなうんちがあるため、体調について少し確認します。";
+        : "水のようなうんち（下痢に近い）があるため、体調について少し確認します。";
     }
     if (["q7_blood", "q8_soiling"].includes(fieldId)) {
       return "うんちが硬い、痛がる、がまんする様子について少し確認します。";
@@ -729,6 +838,9 @@ ${diarySection}
     ADDITIONAL_ORDER,
     DIARY_FIELD_IDS,
     VISIT_META_FIELD_IDS,
+    QUESTIONNAIRE_FIELD_IDS,
+    SHORT_QR_FIELD_ALIASES,
+    SHORT_QR_DIARY_IDS,
     flags,
     shouldShowMedAdherence,
     visibleFieldIds,
@@ -745,6 +857,9 @@ ${diarySection}
     generateSummary,
     generateFacilityShare,
     generatePatientMemo,
+    generateSheetsVisitPayload,
+    generateShortQrPayload,
+    decodeShortQrPayload,
     branchMessage,
   };
 });

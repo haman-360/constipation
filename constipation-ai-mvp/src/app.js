@@ -8,18 +8,22 @@ const {
   normalizeVisitMeta,
   mergeVisitMeta,
   normalizeMultiSelection,
-  hasSafetyNotice,
   generatePhysicianReview,
   generateSummary,
   generateFacilityShare,
   generatePatientMemo,
+  generateSheetsVisitPayload,
+  generateShortQrPayload,
   branchMessage,
 } = window.ConstipationMvp;
 
-const SAFETY_TEXT = "強い腹痛、吐いた、食欲も機嫌もいつもと違う場合は、受付または医療スタッフにもお伝えください。";
+const DEFAULT_SUBMIT_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
 const urlParams = new URLSearchParams(window.location.search);
 const STAFF_MODES = new Set(["staff", "doctor", "clinician"]);
 const isStaffMode = STAFF_MODES.has(urlParams.get("mode")) || urlParams.get("staff") === "1";
+const submitUrlFromParam = urlParams.get("submit_url") || urlParams.get("submitUrl") || "";
+if (submitUrlFromParam) localStorage.setItem("constipation_submit_url", submitUrlFromParam);
+const submitUrl = submitUrlFromParam || localStorage.getItem("constipation_submit_url") || DEFAULT_SUBMIT_URL;
 const visitMetaFromUrl = normalizeVisitMeta({
   patient_id: urlParams.get("patient_id") || urlParams.get("pid"),
   visit_id: urlParams.get("visit_id") || urlParams.get("vid"),
@@ -354,7 +358,6 @@ function updateNextState() {
 
 function renderFinish() {
   state.answers = pruneHiddenAnswers(state.answers);
-  const safe = hasSafetyNotice(state.answers);
   els.progress.hidden = true;
   els.nav.hidden = false;
   els.backButton.disabled = false;
@@ -365,7 +368,6 @@ function renderFinish() {
     <div class="finish">
       <h1>入力ありがとうございました</h1>
       <p>回答内容を診察前の確認用にまとめます。</p>
-      ${safe ? `<div class="notice">${SAFETY_TEXT}</div>` : ""}
       <p>薬の量や治療方針は、診察で医師が確認します。</p>
       ${renderDiaryForm()}
     </div>
@@ -384,6 +386,14 @@ function renderSubmitted() {
   const payload = buildPayload();
   const review = generatePhysicianReview(payload);
   const patientMemo = generatePatientMemo(payload);
+  const shortQrPayload = generateShortQrPayload(payload);
+  const sheetsPayload = generateSheetsVisitPayload(payload);
+  const canAutoSave = Boolean(submitUrl && sheetsPayload.patient_id && sheetsPayload.visit_token);
+  const initialSubmitMessage = canAutoSave
+    ? "院内保存を準備しています。"
+    : submitUrl
+      ? "患者IDまたは来院トークンがURLにないため、院内保存は行いません。URL/QR作成ページから患者ID入りURLで開いてください。"
+      : "この端末では院内保存URLが未設定です。必要時は回答コードまたはJSONを使用します。";
   els.progress.hidden = true;
   els.nav.hidden = true;
   setDoctorPanelVisible(isStaffMode);
@@ -393,7 +403,11 @@ function renderSubmitted() {
       <h1>送信内容を作成しました</h1>
       <p>入力内容は診察前確認のために使います。薬の量や治療方針は診察で医師が確認します。</p>
       ${isStaffMode ? `<p>医療者確認用のダッシュボードを表示しています。院内システム連携用のJSONは必要時に開けます。</p>` : ""}
-      ${hasSafetyNotice(payload) ? `<div class="notice">${SAFETY_TEXT}</div>` : ""}
+      <section class="submit-status" aria-live="polite">
+        <h2>院内保存</h2>
+        <p id="submitStatusText">${initialSubmitMessage}</p>
+        ${canAutoSave ? `<button id="retrySubmitButton" class="button button--secondary button--small" type="button" hidden>再送信</button>` : ""}
+      </section>
       <section class="patient-memo">
         <div class="patient-memo__header">
           <h2>患者用メモ</h2>
@@ -402,15 +416,27 @@ function renderSubmitted() {
         <p>このメモは、あとで相談内容を思い出すためのものです。薬の量を決めるものではありません。</p>
         <pre class="patient-memo__preview">${escapeHtml(patientMemo)}</pre>
       </section>
+      <section class="patient-memo">
+        <div class="patient-memo__header">
+          <h2>回答コード</h2>
+          <button id="copyShortQrButton" class="button button--secondary button--small" type="button">コードコピー</button>
+        </div>
+        <p>院内で必要になった場合に読み取り用QRへ変換できる短い形式です。長いメモや医療判断は含みません。</p>
+        <pre class="patient-memo__preview">${escapeHtml(shortQrPayload)}</pre>
+      </section>
       <button id="restartButton" class="button button--secondary" type="button">最初から入力</button>
     </div>
   `;
   els.summaryOutput.innerHTML = renderPhysicianReview(review);
   els.summaryOutput.dataset.copyText = generateSummary(payload);
   els.summaryOutput.dataset.facilityShareText = generateFacilityShare(payload);
-  els.jsonOutput.textContent = JSON.stringify(payload, null, 2);
+  els.jsonOutput.textContent = JSON.stringify(sheetsPayload, null, 2);
+  wireSubmitStatus(sheetsPayload);
   document.getElementById("copyPatientMemoButton").addEventListener("click", async (event) => {
     await copyText(event.currentTarget, patientMemo, "メモコピー");
+  });
+  document.getElementById("copyShortQrButton").addEventListener("click", async (event) => {
+    await copyText(event.currentTarget, shortQrPayload, "コードコピー");
   });
   document.getElementById("restartButton").addEventListener("click", () => {
     state.started = false;
@@ -421,6 +447,88 @@ function renderSubmitted() {
     state.dashboardMode = "full";
     render();
   });
+}
+
+
+function wireSubmitStatus(sheetsPayload) {
+  if (!submitUrl || !sheetsPayload.patient_id || !sheetsPayload.visit_token) return;
+  const retryButton = document.getElementById("retrySubmitButton");
+  if (retryButton) {
+    retryButton.addEventListener("click", () => submitVisitToAppsScript(sheetsPayload));
+  }
+  submitVisitToAppsScript(sheetsPayload);
+}
+
+async function submitVisitToAppsScript(sheetsPayload) {
+  const statusText = document.getElementById("submitStatusText");
+  const retryButton = document.getElementById("retrySubmitButton");
+  if (!statusText || !submitUrl) return;
+  if (!sheetsPayload.patient_id || !sheetsPayload.visit_token) {
+    statusText.textContent = "患者IDまたは来院トークンがURLにないため、院内保存は行いません。URL/QR作成ページから患者ID入りURLで開いてください。";
+    statusText.className = "submit-status__text submit-status__text--error";
+    return;
+  }
+
+  statusText.textContent = "院内保存へ送信しています。";
+  statusText.className = "submit-status__text submit-status__text--pending";
+  if (retryButton) retryButton.hidden = true;
+
+  try {
+    const result = await postVisitWithReadableResponse_(sheetsPayload);
+    statusText.textContent = `院内保存が完了しました。来院ID: ${result.visit_id || sheetsPayload.visit_id || "未設定"}`;
+    statusText.className = "submit-status__text submit-status__text--success";
+  } catch (error) {
+    try {
+      postVisitWithHiddenForm_(sheetsPayload);
+      statusText.textContent = "院内保存リクエストを送信しました。保存結果はGoogle SheetsのvisitsとApps Scriptの実行ログで確認してください。";
+      statusText.className = "submit-status__text submit-status__text--success";
+    } catch (fallbackError) {
+      statusText.textContent = `院内保存に失敗しました。回答コードまたはJSONで確認できます。詳細: ${fallbackError.message || error.message}`;
+      statusText.className = "submit-status__text submit-status__text--error";
+      if (retryButton) retryButton.hidden = false;
+    }
+  }
+}
+
+async function postVisitWithReadableResponse_(sheetsPayload) {
+  const response = await fetch(submitUrl, {
+    method: "POST",
+    mode: "cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(sheetsPayload),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || `HTTP ${response.status}`);
+  }
+  return result;
+}
+
+function postVisitWithHiddenForm_(sheetsPayload) {
+  const iframeName = "appsScriptSubmitFrame";
+  let iframe = document.querySelector(`iframe[name="${iframeName}"]`);
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.name = iframeName;
+    iframe.hidden = true;
+    document.body.appendChild(iframe);
+  }
+
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = submitUrl;
+  form.target = iframeName;
+  form.hidden = true;
+
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "payload";
+  input.value = JSON.stringify(sheetsPayload);
+  form.appendChild(input);
+
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
 }
 
 function goNext() {

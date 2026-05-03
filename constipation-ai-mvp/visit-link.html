@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>問診URL作成</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="link-tool-shell">
+      <section class="link-tool panel">
+        <div class="link-tool__header">
+          <h1>問診URL作成</h1>
+          <p>患者IDと来院トークンを含む問診URLを作成します。QRはこの端末内で生成されます。院内端末では、先に院内保存URLを1回設定しておくと送信できます。</p>
+        </div>
+
+        <div class="link-tool__grid">
+          <label class="link-field">
+            <span>患者ID</span>
+            <input id="patientIdInput" type="text" inputmode="numeric" maxlength="12" placeholder="例: 12345" />
+          </label>
+          <label class="link-field">
+            <span>来院トークン</span>
+            <div class="link-field__inline">
+              <input id="visitTokenInput" type="text" maxlength="12" placeholder="例: A7K2" />
+              <button id="tokenButton" class="button button--secondary button--small" type="button">生成</button>
+            </div>
+          </label>
+          <label class="link-field link-field--wide">
+            <span>問診アプリURL</span>
+            <input id="baseUrlInput" type="url" />
+          </label>
+        </div>
+
+        <div class="link-tool__actions">
+          <button id="copyUrlButton" class="button" type="button">URLコピー</button>
+          <button id="printButton" class="button button--secondary" type="button">印刷</button>
+        </div>
+
+        <section class="link-output">
+          <h2>作成されたURL</h2>
+          <pre id="visitUrlOutput"></pre>
+        </section>
+
+        <section class="qr-card" id="qrPrintArea">
+          <div>
+            <p class="qr-card__label">便秘問診</p>
+            <h2 id="qrPatientLabel">患者ID未入力</h2>
+            <p id="qrTokenLabel">来院トークン未入力</p>
+          </div>
+          <div id="qrOutput" class="qr-card__code" aria-label="問診QR"></div>
+          <p class="qr-card__note">スマートフォンで読み取り、診察前に入力してください。</p>
+        </section>
+
+        <p id="linkToolMessage" class="link-tool__message" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="./src/visit-link.js?v=20260503-2"></script>
+  </body>
+</html>

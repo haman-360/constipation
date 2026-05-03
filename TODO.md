@@ -3,7 +3,7 @@
 ## 優先度：高（すぐやる）
 
 - [x] 医師レビュー用ワンページ資料の更新
-- [x] alert / watch / stable 表現の調整
+- [x] watch / stable 表現の調整
 - [x] 「受付・スタッフ共有」の条件精査
 - [x] 医療安全表現の最終調整
 
@@ -30,7 +30,7 @@
 
 ## 優先度：中（テスト）
 
-- [x] alertケース網羅
+- [x] 旧alert相当ケースのwatch化テスト
 - [x] watchケース網羅
 - [x] stableケース網羅
 - [x] 境界値テスト（3日 vs 4日無排便）
@@ -52,28 +52,56 @@
 - [x] Google Sheets履歴連携設計
 - [x] 患者向け保存メモ生成
 - [x] patient_id / visit_id / visit_token のpayload追加
-- [ ] Google Sheets保存用payload生成
-- [ ] Apps Script submitVisit API設計・実装
-- [ ] Google Sheetsテンプレート作成
-- [ ] 医師側履歴読み込み画面または関数
-- [ ] ChatGPT貼り付け用テキスト生成
-- [ ] 回答後QRの短縮形式検討
+- [x] Google Sheets保存用payload生成
+- [x] Apps Script submitVisit API設計・実装
+- [x] Google Sheetsテンプレート作成
+- [x] 医師側履歴読み込み画面または関数
+- [x] ChatGPT貼り付け用テキスト生成
+- [x] 回答後QRの短縮形式検討
+- [x] HTMLからApps ScriptへのPOST送信
+- [x] テスト患者データのvisits保存確認
+- [x] Sheets表示改善（列幅・折り返し・固定列・JSON列非表示）
 
 ---
 
 ## 医療者監修が必要
 
 - [x] レッドフラッグ定義（監修用たたき台）
-- [ ] 受診基準（緊急 / 通常）
-- [ ] 表現の適切性（保護者向け）
-- [ ] 便性状分類の最終仕様
+- [x] 受診基準（緊急 / 通常）
+- [x] 表現の適切性（保護者向け）
+- [x] 便性状分類の最終仕様
 
 ---
 
 ## GitHub化対応
 
-- [ ] リポジトリ作成
-- [ ] README整備
-- [ ] 不要ファイル整理
-- [ ] ディレクトリ構造整理
-- [ ] 初回commit
+- [x] リポジトリ作成
+- [x] README整備
+- [x] 不要ファイル整理
+- [x] ディレクトリ構造整理
+- [x] 初回commit
+
+---
+
+## 次に検討
+
+- [ ] 医師側履歴確認URLの動作テスト
+- [ ] `chatGPTContext` 出力の実データ確認
+- [x] 患者ID・visit_token入りURL/QR作成ページ
+- [x] iPhoneのQR読み取りからSheets保存成功確認
+- [x] Macの患者ID入りURLからSheets保存成功確認
+- [x] 患者IDなしURLでは保存しない表示へ調整
+- [ ] URL/QR作成ページの問診アプリURL欄を詳細設定化または非表示化
+- [ ] 問診HTMLの公開方法を決める（院内端末のみ / GitHub Pages等 / Apps Script HTML化）
+- [ ] Web App公開範囲の院内運用検討
+- [ ] 追加の医療者レビュー後修正
+
+
+---
+
+## 休憩後に再開するなら
+
+- [ ] URL/QR作成ページを受付用に簡略化する（患者ID入力とQR表示を中心にする）
+- [ ] 問診HTMLの置き場所を決める
+- [ ] 実患者データを入れる前のテスト患者運用手順を1枚にまとめる
+- [ ] GitHubへ今回の変更をcommitする

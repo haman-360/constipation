@@ -13,6 +13,9 @@ const {
   generateSummary,
   generateFacilityShare,
   generatePatientMemo,
+  generateSheetsVisitPayload,
+  generateShortQrPayload,
+  decodeShortQrPayload,
 } = require("../src/questionnaire");
 
 const UNKNOWN = "わからない";
@@ -37,7 +40,7 @@ const cases = [
     input: {
       q1_last_bowel_movement: "今日",
       q2_bowel_frequency: "1日1回くらい",
-      q3_stool_consistency: "普通",
+      q3_stool_consistency: "普通（バナナくらい）",
       q4_pain: "痛がらない",
       q5_withholding: "ない",
       q6_med_status: "先生に言われた量で飲んでいる",
@@ -73,7 +76,7 @@ const cases = [
     input: {
       q1_last_bowel_movement: "今日",
       q2_bowel_frequency: "1日1回くらい",
-      q3_stool_consistency: "普通",
+      q3_stool_consistency: "普通（バナナくらい）",
       q4_pain: "痛がらない",
       q5_withholding: "ない",
       q6_med_status: "先生から調節してよいと言われていて、うんちの様子を見ながら調節している",
@@ -106,7 +109,7 @@ const cases = [
     input: {
       q1_last_bowel_movement: "昨日",
       q2_bowel_frequency: "2-3日に1回くらい",
-      q3_stool_consistency: "普通",
+      q3_stool_consistency: "普通（バナナくらい）",
       q4_pain: "痛がらない",
       q5_withholding: "ない",
       q6_med_status: "飲みにくくて残る",
@@ -122,7 +125,7 @@ const cases = [
     input: {
       q1_last_bowel_movement: "今日",
       q2_bowel_frequency: "1日に2回以上",
-      q3_stool_consistency: "水のよう",
+      q3_stool_consistency: "水のよう（下痢に近い）",
       q4_pain: "わからない",
       q5_withholding: "わからない",
       q6_med_status: "わからない",
@@ -131,7 +134,7 @@ const cases = [
       q11_appetite_mood: "食欲も機嫌も気になる",
     },
     visible: ["q9_abdominal_symptom", "q10_vomiting", "q11_appetite_mood"],
-    safety: true,
+    safety: false,
     includes: ["水のような便あり。", "- 補足: 不明"],
   },
   {
@@ -139,7 +142,7 @@ const cases = [
     input: {
       q1_last_bowel_movement: "昨日",
       q2_bowel_frequency: "1日1回くらい",
-      q3_stool_consistency: "普通",
+      q3_stool_consistency: "普通（バナナくらい）",
       q4_pain: "痛がらない",
       q5_withholding: "ない",
       q6_med_status: "先生に言われた量で飲んでいる",
@@ -200,7 +203,7 @@ const reviewScenarios = [
     input: cases[0].input,
     level: "stable",
     label: "通常確認",
-    message: "現時点で受付・スタッフ共有の表示対象はありません。",
+    message: "現時点で目立つ追加確認項目はありません。",
     headline: "今回の回答では、目立つ追加確認項目はありません。",
   },
   {
@@ -226,10 +229,10 @@ const reviewScenarios = [
   {
     id: "REVIEW-ALERT",
     input: cases[5].input,
-    level: "alert",
-    label: "受付・スタッフ共有",
-    message: "受付・スタッフ共有の表示対象となる体調変化が含まれます。",
-    headline: "強い腹痛・お腹の張り、嘔吐、食欲と機嫌の変化があります。水のような便があります。",
+    level: "watch",
+    label: "診察で確認",
+    message: "診察時に確認したい追加情報があります。",
+    headline: "強い腹痛・お腹の張りがあります。嘔吐があります。食欲と機嫌の変化があります。水のような便があります。",
   },
   {
     id: "REVIEW-APPETITE-ONLY-WATCH",
@@ -252,7 +255,7 @@ for (const scenario of reviewScenarios) {
 const stableBase = {
   q1_last_bowel_movement: "今日",
   q2_bowel_frequency: "1日1回くらい",
-  q3_stool_consistency: "普通",
+  q3_stool_consistency: "普通（バナナくらい）",
   q4_pain: "痛がらない",
   q5_withholding: "ない",
   q6_med_status: "先生に言われた量で飲んでいる",
@@ -274,18 +277,18 @@ const urgencyCases = [
       q10_vomiting: "ない",
       q11_appetite_mood: "いつも通り",
     },
-    level: "alert",
+    level: "watch",
   },
   {
     id: "URGENCY-ALERT-VOMITING",
     input: {
       ...stableBase,
-      q3_stool_consistency: "水のよう",
+      q3_stool_consistency: "水のよう（下痢に近い）",
       q9_abdominal_symptom: "ない",
       q10_vomiting: "ある",
       q11_appetite_mood: "いつも通り",
     },
-    level: "alert",
+    level: "watch",
   },
   {
     id: "URGENCY-ALERT-APPETITE-AND-MOOD",
@@ -296,7 +299,7 @@ const urgencyCases = [
       q10_vomiting: "ない",
       q11_appetite_mood: "食欲も機嫌も気になる",
     },
-    level: "alert",
+    level: "watch",
   },
   {
     id: "URGENCY-WATCH-APPETITE-ONLY",
@@ -324,7 +327,7 @@ const urgencyCases = [
     id: "URGENCY-WATCH-WATERY-STOOL",
     input: {
       ...stableBase,
-      q3_stool_consistency: "水のよう",
+      q3_stool_consistency: "水のよう（下痢に近い）",
       q9_abdominal_symptom: "ない",
       q10_vomiting: "ない",
       q11_appetite_mood: "いつも通り",
@@ -638,7 +641,7 @@ for (const recurrenceCase of recurrenceCases) {
   assert(review.checkItems.includes(recurrenceCase.checkItem), `${recurrenceCase.id}: recurrence check item missing`);
 }
 
-const alertCases = [
+const formerAlertCases = [
   {
     id: "ALERT-STRONG-ABDOMINAL-ONLY",
     input: {
@@ -649,19 +652,19 @@ const alertCases = [
       q11_appetite_mood: "いつも通り",
     },
     headline: "強い腹痛・お腹の張りがあります。4日以上の無排便または排便間隔のあきがあります。",
-    checkItem: "強い腹痛・お腹の張りがあります。受付または医療スタッフにも共有する項目です。",
+    checkItem: "強い腹痛・お腹の張りがあります。診察で確認します。",
   },
   {
     id: "ALERT-VOMITING-ONLY",
     input: {
       ...stableBase,
-      q3_stool_consistency: "水のよう",
+      q3_stool_consistency: "水のよう（下痢に近い）",
       q9_abdominal_symptom: "ない",
       q10_vomiting: "ある",
       q11_appetite_mood: "いつも通り",
     },
     headline: "嘔吐があります。水のような便があります。",
-    checkItem: "嘔吐があります。受付または医療スタッフにも共有する項目です。",
+    checkItem: "嘔吐があります。診察で確認します。",
   },
   {
     id: "ALERT-APPETITE-AND-MOOD-ONLY",
@@ -673,33 +676,33 @@ const alertCases = [
       q11_appetite_mood: "食欲も機嫌も気になる",
     },
     headline: "食欲と機嫌の変化があります。4日以上の無排便または排便間隔のあきがあります。",
-    checkItem: "食欲と機嫌の変化があります。受付または医療スタッフにも共有する項目です。",
+    checkItem: "食欲と機嫌の変化があります。診察で確認します。",
   },
   {
     id: "ALERT-COMBINED-SAFETY",
     input: {
       ...stableBase,
-      q3_stool_consistency: "水のよう",
+      q3_stool_consistency: "水のよう（下痢に近い）",
       q9_abdominal_symptom: "強い",
       q10_vomiting: "ある",
       q11_appetite_mood: "食欲も機嫌も気になる",
     },
-    headline: "強い腹痛・お腹の張り、嘔吐、食欲と機嫌の変化があります。水のような便があります。",
-    checkItem: "強い腹痛・お腹の張り、嘔吐、食欲と機嫌の変化があります。受付または医療スタッフにも共有する項目です。",
+    headline: "強い腹痛・お腹の張りがあります。嘔吐があります。食欲と機嫌の変化があります。水のような便があります。",
+    checkItem: "強い腹痛・お腹の張り、嘔吐、食欲と機嫌の変化があります。診察で確認します。",
   },
 ];
 
-for (const alertCase of alertCases) {
-  const payload = pruneHiddenAnswers(alertCase.input);
+for (const formerAlertCase of formerAlertCases) {
+  const payload = pruneHiddenAnswers(formerAlertCase.input);
   const review = generatePhysicianReview(payload);
   const summary = generateSummary(payload);
-  assert.strictEqual(review.urgency.level, "alert", `${alertCase.id}: urgency level mismatch`);
-  assert.strictEqual(review.urgency.label, "受付・スタッフ共有", `${alertCase.id}: urgency label mismatch`);
-  assert.strictEqual(hasSafetyNotice(payload), true, `${alertCase.id}: safety notice mismatch`);
-  assert.strictEqual(review.headline, alertCase.headline, `${alertCase.id}: headline mismatch`);
-  assert(review.checkItems.includes(alertCase.checkItem), `${alertCase.id}: alert check item missing`);
+  assert.strictEqual(review.urgency.level, "watch", `${formerAlertCase.id}: urgency level mismatch`);
+  assert.strictEqual(review.urgency.label, "診察で確認", `${formerAlertCase.id}: urgency label mismatch`);
+  assert.strictEqual(hasSafetyNotice(payload), false, `${formerAlertCase.id}: safety notice mismatch`);
+  assert.strictEqual(review.headline, formerAlertCase.headline, `${formerAlertCase.id}: headline mismatch`);
+  assert(review.checkItems.includes(formerAlertCase.checkItem), `${formerAlertCase.id}: former alert check item missing`);
   for (const text of forbidden) {
-    assert(!summary.includes(text), `${alertCase.id}: forbidden output found ${text}`);
+    assert(!summary.includes(text), `${formerAlertCase.id}: forbidden output found ${text}`);
   }
 }
 
@@ -720,7 +723,7 @@ const watchCases = [
     id: "WATCH-WATERY-STOOL",
     input: {
       ...stableBase,
-      q3_stool_consistency: "水のよう",
+      q3_stool_consistency: "水のよう（下痢に近い）",
       q9_abdominal_symptom: "ない",
       q10_vomiting: "ない",
       q11_appetite_mood: "いつも通り",
@@ -897,7 +900,7 @@ for (const stableCase of stableCases) {
 
   assert.strictEqual(review.urgency.level, "stable", `${stableCase.id}: urgency level mismatch`);
   assert.strictEqual(review.urgency.label, "通常確認", `${stableCase.id}: urgency label mismatch`);
-  assert.strictEqual(review.urgency.message, "現時点で受付・スタッフ共有の表示対象はありません。", `${stableCase.id}: urgency message mismatch`);
+  assert.strictEqual(review.urgency.message, "現時点で目立つ追加確認項目はありません。", `${stableCase.id}: urgency message mismatch`);
   assert.strictEqual(hasSafetyNotice(payload), false, `${stableCase.id}: safety notice mismatch`);
   assert.strictEqual(review.headline, "今回の回答では、目立つ追加確認項目はありません。", `${stableCase.id}: headline mismatch`);
   assert(review.checkItems.includes(stableCase.checkItem), `${stableCase.id}: stable check item missing`);
@@ -1239,6 +1242,93 @@ assert.strictEqual(visitPayload.visit_token, "M1", "VISIT-META-PAYLOAD: visit_to
 assert.strictEqual(visitPayload.visit_id, "20260503-54321-M1", "VISIT-META-PAYLOAD: visit_id mismatch");
 assert(generateFacilityShare(visitPayload).includes('"patient_id": "54321"'), "VISIT-META-PAYLOAD: facility share should include patient_id");
 
+const sheetsPayloadInput = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers({
+  ...stableBase,
+  q1_last_bowel_movement: "4日以上前",
+  q3_stool_consistency: "硬い",
+  q9_abdominal_symptom: "ない",
+  q10_vomiting: "ない",
+  q11_appetite_mood: "いつも通り",
+  q7_blood: "紙に少しつく",
+  q8_soiling: "ない",
+}), {
+  diary_days_recorded: "7",
+  diary_bowel_days: "3",
+  diary_longest_no_bowel_days: "4",
+  diary_hard_days: "2",
+  diary_pain_days: "1",
+  diary_med_taken_days: "6",
+}), {
+  patient_id: "123456",
+  visit_token: "a7-k2",
+  submitted_at: "2026-05-03T10:15:00+09:00",
+});
+const sheetsPayload = generateSheetsVisitPayload(sheetsPayloadInput);
+assert.strictEqual(sheetsPayload.patient_id, "12345", "SHEETS-PAYLOAD: patient_id mismatch");
+assert.strictEqual(sheetsPayload.visit_token, "A7K2", "SHEETS-PAYLOAD: visit_token mismatch");
+assert.strictEqual(sheetsPayload.visit_id, "20260503-12345-A7K2", "SHEETS-PAYLOAD: visit_id mismatch");
+assert.strictEqual(sheetsPayload.outputs.urgency_level, "watch", "SHEETS-PAYLOAD: urgency level mismatch");
+assert.strictEqual(sheetsPayload.outputs.urgency_label, "診察で確認", "SHEETS-PAYLOAD: urgency label mismatch");
+assert(sheetsPayload.outputs.headline.includes("4日以上"), "SHEETS-PAYLOAD: headline missing");
+assert(sheetsPayload.outputs.summary_text.includes("【診察前 便秘ミニサマリー】"), "SHEETS-PAYLOAD: summary missing");
+assert(sheetsPayload.outputs.facility_share_text.includes("【院内共有用 便秘問診】"), "SHEETS-PAYLOAD: facility share missing");
+assert(sheetsPayload.outputs.patient_memo_text.includes("【便秘メモ】"), "SHEETS-PAYLOAD: patient memo missing");
+assert.deepStrictEqual(Object.keys(sheetsPayload.diary).sort(), [
+  "diary_bowel_days",
+  "diary_days_recorded",
+  "diary_hard_days",
+  "diary_longest_no_bowel_days",
+  "diary_med_taken_days",
+  "diary_pain_days",
+].sort(), "SHEETS-PAYLOAD: diary keys mismatch");
+assert(!Object.prototype.hasOwnProperty.call(sheetsPayload.questionnaire, "diary_days_recorded"), "SHEETS-PAYLOAD: questionnaire should not contain diary fields");
+assert(!Object.prototype.hasOwnProperty.call(sheetsPayload.diary, "q1_last_bowel_movement"), "SHEETS-PAYLOAD: diary should not contain questionnaire fields");
+for (const text of patientMemoForbidden) {
+  assert(!JSON.stringify(sheetsPayload).includes(text), `SHEETS-PAYLOAD: forbidden output found ${text}`);
+}
+
+const shortQrInput = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers({
+  ...stableBase,
+  q1_last_bowel_movement: "4日以上前",
+  q2_bowel_frequency: "4日以上あくことがある",
+  q3_stool_consistency: "硬い",
+  q4_pain: "強く痛がる",
+  q5_withholding: "ある",
+  q6_med_status: "飲みにくくて残る",
+  q6_med_adherence_flags: ["飲みにくくて残る"],
+  q9_abdominal_symptom: "少しある",
+  q10_vomiting: "ない",
+  q11_appetite_mood: "いつも通り",
+  q7_blood: "紙に少しつく",
+  q8_soiling: "ときどきある",
+  q13_med_difficulty_reason: ["味が苦手", "量が多い"],
+}), {
+  diary_days_recorded: "7",
+  diary_bowel_days: "3",
+  diary_longest_no_bowel_days: "4",
+  diary_hard_days: "2",
+  diary_pain_days: "1",
+  diary_med_taken_days: "6",
+  diary_note: "QRには含めない",
+}), {
+  patient_id: "12345",
+  visit_token: "qr-9",
+});
+const shortQrPayload = generateShortQrPayload(shortQrInput);
+assert(shortQrPayload.startsWith("v1|pid=12345|tok=QR9"), "SHORT-QR: prefix/meta mismatch");
+assert(shortQrPayload.includes("q1=3"), "SHORT-QR: q1 code mismatch");
+assert(shortQrPayload.includes("q13=0.1"), "SHORT-QR: multi code mismatch");
+assert(shortQrPayload.includes("d=7,3,4,2,1,6"), "SHORT-QR: diary code mismatch");
+assert(!shortQrPayload.includes("QRには含めない"), "SHORT-QR: should not include long diary note");
+assert(shortQrPayload.length < 180, "SHORT-QR: payload should stay compact");
+const decodedShortQr = decodeShortQrPayload(shortQrPayload);
+assert.strictEqual(decodedShortQr.patient_id, "12345", "SHORT-QR: decoded patient_id mismatch");
+assert.strictEqual(decodedShortQr.visit_token, "QR9", "SHORT-QR: decoded visit_token mismatch");
+assert.strictEqual(decodedShortQr.q1_last_bowel_movement, "4日以上前", "SHORT-QR: decoded q1 mismatch");
+assert.deepStrictEqual(decodedShortQr.q13_med_difficulty_reason, ["味が苦手", "量が多い"], "SHORT-QR: decoded multi mismatch");
+assert.strictEqual(decodedShortQr.diary_longest_no_bowel_days, 4, "SHORT-QR: decoded diary mismatch");
+assert(!Object.prototype.hasOwnProperty.call(decodedShortQr, "diary_note"), "SHORT-QR: decoded payload should not include diary note");
+
 console.log(
-  `${cases.length} MVP questionnaire cases, ${urgencyCases.length} urgency cases, ${medicationCases.length} medication cases, ${medicationBranchCases.length} medication branch cases, ${medicationMultiSelectCases.length} medication multi-select cases, ${recurrenceCases.length} recurrence cases, ${alertCases.length} alert cases, ${watchCases.length} watch cases, ${stableCases.length} stable cases, ${boundaryCases.length} boundary cases, ${diaryCases.length} diary cases, ${facilityShareCases.length} facility share cases, ${patientMemoCases.length} patient memo cases, and ${visitMetaCases.length} visit meta cases passed`
+  `${cases.length} MVP questionnaire cases, ${urgencyCases.length} urgency cases, ${medicationCases.length} medication cases, ${medicationBranchCases.length} medication branch cases, ${medicationMultiSelectCases.length} medication multi-select cases, ${recurrenceCases.length} recurrence cases, ${formerAlertCases.length} former alert-now-watch cases, ${watchCases.length} watch cases, ${stableCases.length} stable cases, ${boundaryCases.length} boundary cases, ${diaryCases.length} diary cases, ${facilityShareCases.length} facility share cases, ${patientMemoCases.length} patient memo cases, and ${visitMetaCases.length} visit meta cases plus 1 sheets payload case and 1 short QR case passed`
 );

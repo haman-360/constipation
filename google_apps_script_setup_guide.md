@@ -75,6 +75,10 @@ http://localhost:8000/index.html?patient_id=12345&visit_token=A7K2
 2. 問診を最後まで入力する。
 3. 送信完了画面の `院内保存` に成功表示が出るか確認する。
 4. Google Sheetsの `visits` に1行追加されているか確認する。
+5. 同じ患者IDが `patients` に未登録だった場合、`patients` に1行追加されているか確認する。
+6. 直近日誌を入力した場合、`diary_weekly` に1行追加されているか確認する。
+
+`prescriptions` と `toilet_training` は患者問診からは自動入力しない。処方履歴とトイレトレーニング状況は、医師側で確認した内容を別途入力・管理する。
 
 ## 7. 医師側履歴確認URLを作る
 

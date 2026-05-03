@@ -183,6 +183,8 @@ MVP → Google Sheets連携の動作確認済み段階
 - Web Appはテスト時に「アクセスできるユーザー: 全員」で動作確認。
 - `Code.gs` は単独Apps Scriptでも動くよう `SPREADSHEET_ID` 指定に対応。
 - Sheets表示改善として列幅、折り返し、固定列、JSON列非表示を追加。
+- `submitVisit` 保存時に、未登録患者IDを `patients` へ自動追加し、直近日誌入力がある場合は `diary_weekly` へ自動保存する。
+- `prescriptions` と `toilet_training` は、患者回答から自動推測せず、医師側で入力・管理する台帳として扱う。
 - `visit-link.html` で、患者ID・来院トークン入りの問診URLとQRを作成可能。
 - `history-link.html` で、医師用履歴表示、患者履歴JSON、ChatGPT貼り付け用テキストの確認URLを作成可能。
 - Macからの患者ID入りURL入力、iPhoneでのQR読み取りの双方で `visits` 保存成功を確認。

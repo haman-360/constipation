@@ -88,6 +88,9 @@
 - [x] 医師側履歴確認URLの動作テスト
 - [x] `chatGPTContext` 出力の実データ確認
 - [x] 医師側履歴を読みやすく表示するHTML出力
+- [x] `submitVisit` 時の `patients` 自動登録
+- [x] `submitVisit` 時の `diary_weekly` 自動保存
+- [x] `prescriptions` / `toilet_training` は医師入力として自動生成しない方針を明記
 - [x] 医師側履歴確認URL作成ページ
 - [x] 患者ID・visit_token入りURL/QR作成ページ
 - [x] iPhoneのQR読み取りからSheets保存成功確認

@@ -43,6 +43,9 @@
 4. `urgency_level` が `watch` または `stable` になっている。
 5. `questionnaire_json` と `summary_text` が保存されている。
 6. JSON列が通常確認の邪魔にならない表示設定になっている。
+7. `patients` シートに同じテストIDが未登録だった場合、1行追加されている。
+8. 直近日誌を入力した場合、`diary_weekly` シートに1行追加されている。
+9. `prescriptions` と `toilet_training` は患者問診から自動入力されていない。
 
 ## 医師側確認で見ること
 

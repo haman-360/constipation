@@ -112,13 +112,16 @@ function doPost(e) {
 
 function submitVisit(payload) {
   validateSubmitVisitPayload_(payload);
+  const patientId = normalizePatientId_(payload.patient_id);
+  if (!patientId) throw new Error("patient_id must contain digits.");
   const sheet = getOrCreateSheet_(SHEET_NAMES.visits, VISITS_HEADERS);
   const savedAt = new Date().toISOString();
   const outputs = payload.outputs || {};
 
+  const patientSaved = upsertPatient_(patientId, savedAt);
   sheet.appendRow([
     payload.visit_id,
-    payload.patient_id,
+    patientId,
     payload.visit_token || "",
     payload.submitted_at || "",
     savedAt,
@@ -133,12 +136,84 @@ function submitVisit(payload) {
     false,
     "",
   ]);
+  const diaryWeeklySaved = appendDiaryWeeklyIfPresent_(payload, patientId, savedAt);
 
   return {
     ok: true,
     visit_id: payload.visit_id,
+    patient_id: patientId,
     saved_at: savedAt,
+    patient_saved: patientSaved,
+    diary_weekly_saved: diaryWeeklySaved,
   };
+}
+
+function upsertPatient_(patientId, createdAt) {
+  const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
+  const exists = rowsForPatient_(SHEET_NAMES.patients, PATIENTS_HEADERS, patientId).length > 0;
+  if (exists) return false;
+  sheet.appendRow([
+    patientId,
+    "",
+    "",
+    createdAt,
+    "",
+  ]);
+  return true;
+}
+
+function appendDiaryWeeklyIfPresent_(payload, patientId, savedAt) {
+  const diary = payload.diary || {};
+  if (!hasDiaryData_(diary)) return false;
+
+  const recordedDays = numberOrBlank_(diary.diary_days_recorded);
+  const periodEnd = dateOnlyInScriptTimezone_(payload.submitted_at || savedAt);
+  const periodStart = recordedDays ? addDays_(periodEnd, -(recordedDays - 1)) : "";
+  const sheet = getOrCreateSheet_(SHEET_NAMES.diaryWeekly, DIARY_WEEKLY_HEADERS);
+
+  sheet.appendRow([
+    patientId,
+    periodStart,
+    periodEnd,
+    recordedDays,
+    numberOrBlank_(diary.diary_bowel_days),
+    numberOrBlank_(diary.diary_longest_no_bowel_days),
+    numberOrBlank_(diary.diary_hard_days),
+    numberOrBlank_(diary.diary_pain_days),
+    "",
+    "",
+    numberOrBlank_(diary.diary_med_taken_days),
+    diary.diary_note || "",
+  ]);
+  return true;
+}
+
+function hasDiaryData_(diary) {
+  return Object.keys(diary).some((key) => key.startsWith("diary_") && diary[key] !== undefined && diary[key] !== "");
+}
+
+function numberOrBlank_(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  const number = Number(value);
+  return Number.isFinite(number) ? number : "";
+}
+
+function dateOnlyInScriptTimezone_(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  try {
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  } catch (error) {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+function addDays_(dateText, days) {
+  if (!dateText) return "";
+  const date = new Date(`${dateText}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return "";
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 

@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>問診URL作成</title>
+    <title>受付用QR作成</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="link-tool-shell">
       <section class="link-tool panel">
         <div class="link-tool__header">
-          <h1>問診URL作成</h1>
-          <p>患者IDと来院トークンを含む問診URLを作成します。QRはこの端末内で生成されます。院内端末では、先に院内保存URLを1回設定しておくと送信できます。</p>
+          <h1>受付用QR作成</h1>
+          <p>患者IDを入力すると、来院トークン入りの問診QRを作成します。QRはこの端末内で生成されます。</p>
         </div>
 
         <div class="link-tool__grid">
@@ -19,18 +19,23 @@
             <span>患者ID</span>
             <input id="patientIdInput" type="text" inputmode="numeric" maxlength="12" placeholder="例: 12345" />
           </label>
-          <label class="link-field">
+          <label class="link-field link-field--readonly">
             <span>来院トークン</span>
             <div class="link-field__inline">
               <input id="visitTokenInput" type="text" maxlength="12" placeholder="例: A7K2" />
               <button id="tokenButton" class="button button--secondary button--small" type="button">生成</button>
             </div>
           </label>
+        </div>
+
+        <details class="link-advanced">
+          <summary>詳細設定</summary>
           <label class="link-field link-field--wide">
             <span>問診アプリURL</span>
             <input id="baseUrlInput" type="url" />
           </label>
-        </div>
+          <p>通常は変更不要です。QR読み取り端末から問診画面へアクセスできない場合だけ、院内で使うURLに変更してください。</p>
+        </details>
 
         <div class="link-tool__actions">
           <button id="copyUrlButton" class="button" type="button">URLコピー</button>
@@ -56,6 +61,6 @@
       </section>
     </main>
 
-    <script src="./src/visit-link.js?v=20260503-2"></script>
+    <script src="./src/visit-link.js?v=20260503-3"></script>
   </body>
 </html>

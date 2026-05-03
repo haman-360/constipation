@@ -76,14 +76,38 @@ http://localhost:8000/index.html?patient_id=12345&visit_token=A7K2
 3. 送信完了画面の `院内保存` に成功表示が出るか確認する。
 4. Google Sheetsの `visits` に1行追加されているか確認する。
 
-## 7. 失敗時の確認
+## 7. 医師側履歴確認URLを作る
+
+`visit-link.html` と同じサーバーで、次を開く。
+
+```text
+http://localhost:8000/history-link.html
+```
+
+使い方:
+
+1. `患者ID` にテスト患者IDを入力する。
+2. `Google Apps Script Web App URL` にデプロイ済みの `/exec` URLを入力する。
+3. `患者履歴JSONを開く` で `patientHistory` の応答を確認する。
+4. `ChatGPT用テキストを開く` で `chatGPTContext` の出力を確認する。
+
+作成されるURL例:
+
+```text
+https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=patientHistory&patient_id=99999&limit=5
+https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=chatGPTContext&patient_id=99999&limit=5
+```
+
+実患者データ投入前は、必ずテスト患者IDで保存済みデータを作ってから確認する。
+
+## 8. 失敗時の確認
 
 - `院内保存URLが未設定` と出る: `submit_url` が渡っていない。
 - `Spreadsheet is not bound` と出る: `SPREADSHEET_ID` が未設定、または間違っている。
 - 権限エラーが出る: Web Appのデプロイ権限、またはGoogle Sheetsへのアクセス権限を確認する。
 - ブラウザから送信できない: Web App URLが `/exec` で終わるデプロイURLか確認する。`/dev` URLでは外部ページから使いにくい場合がある。
 
-## 8. 運用上の注意
+## 9. 運用上の注意
 
 - 実患者データを入れる前に、テスト患者IDで保存、履歴取得、ChatGPT貼り付け用テキストを確認する。
 - 患者IDだけで個人を直接特定できる情報を入れない。

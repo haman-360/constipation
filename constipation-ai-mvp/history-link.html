@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>医師用履歴URL作成</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="link-tool-shell">
+      <section class="link-tool panel">
+        <div class="link-tool__header">
+          <h1>医師用履歴URL作成</h1>
+          <p>患者IDから、Google Sheetsの履歴確認URLとChatGPT貼り付け用テキストURLを作成します。</p>
+        </div>
+
+        <div class="link-tool__grid">
+          <label class="link-field">
+            <span>患者ID</span>
+            <input id="patientIdInput" type="text" inputmode="numeric" maxlength="12" placeholder="例: 12345" />
+          </label>
+          <label class="link-field">
+            <span>取得件数</span>
+            <input id="limitInput" type="number" inputmode="numeric" min="1" max="20" value="5" />
+          </label>
+        </div>
+
+        <details class="link-advanced" open>
+          <summary>Web App設定</summary>
+          <label class="link-field link-field--wide">
+            <span>Google Apps Script Web App URL</span>
+            <input id="webAppUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+          </label>
+          <p>デプロイ済みの `/exec` URLを入力してください。一度入力すると、この端末に保存されます。</p>
+        </details>
+
+        <div class="link-tool__actions">
+          <button id="copyHistoryButton" class="button" type="button">履歴URLコピー</button>
+          <button id="copyContextButton" class="button button--secondary" type="button">ChatGPT用URLコピー</button>
+        </div>
+
+        <section class="link-output">
+          <h2>患者履歴JSON</h2>
+          <pre id="historyUrlOutput"></pre>
+          <p><a id="historyOpenLink" href="#" target="_blank" rel="noreferrer">患者履歴JSONを開く</a></p>
+        </section>
+
+        <section class="link-output">
+          <h2>ChatGPT貼り付け用テキスト</h2>
+          <pre id="contextUrlOutput"></pre>
+          <p><a id="contextOpenLink" href="#" target="_blank" rel="noreferrer">ChatGPT用テキストを開く</a></p>
+        </section>
+
+        <p id="historyToolMessage" class="link-tool__message" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="./src/history-link.js?v=20260503-1"></script>
+  </body>
+</html>

@@ -916,6 +916,30 @@ pre {
   gap: 8px;
 }
 
+.link-advanced {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfe;
+}
+
+.link-advanced summary {
+  color: var(--accent-strong);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.link-advanced .link-field {
+  margin-top: 14px;
+}
+
+.link-advanced p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .link-tool__actions {
   display: flex;
   flex-wrap: wrap;
@@ -930,6 +954,17 @@ pre {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfdfe;
+}
+
+.link-output a {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.link-output a.is-disabled {
+  color: var(--muted);
+  pointer-events: none;
+  text-decoration: none;
 }
 
 .qr-card {
@@ -976,6 +1011,7 @@ pre {
 
   body > *:not(.link-tool-shell),
   .link-tool__grid,
+  .link-advanced,
   .link-tool__actions,
   .link-output,
   .link-tool__message,

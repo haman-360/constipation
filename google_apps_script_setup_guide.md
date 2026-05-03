@@ -89,6 +89,7 @@ http://localhost:8000/history-link.html
 1. `患者ID` にテスト患者IDを入力する。
 2. `Google Apps Script Web App URL` にデプロイ済みの `/exec` URLを入力する。
 3. `医師用履歴表示を開く` で診察前に見やすい履歴画面を確認する。
+   - 画面内の `ChatGPT貼り付け用テキストをページ内で表示` からも内容を確認できる。
 4. `患者履歴JSONを開く` で `patientHistory` の応答を確認する。
 5. `ChatGPT用テキストを開く` で `chatGPTContext` の出力を確認する。
 

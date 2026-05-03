@@ -195,6 +195,7 @@ function generateChatGPTContext(params) {
 function generateDoctorHistoryHtml(params) {
   const history = getPatientHistory(params);
   const contextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5));
+  const contextText = generateChatGPTContext(params);
   const visitItems = history.visits.length
     ? history.visits.map(formatVisitHtml_).join("")
     : "<p>受診・問診履歴はありません。</p>";
@@ -219,6 +220,9 @@ function generateDoctorHistoryHtml(params) {
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
       .item { padding: 10px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
       .label { display: block; color: #5d6673; font-size: .86rem; }
+      details { margin-top: 16px; }
+      summary { color: #07576b; cursor: pointer; font-weight: 800; }
+      pre { overflow: auto; white-space: pre-wrap; line-height: 1.55; padding: 14px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
       a { color: #07576b; font-weight: 800; }
       @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
       @media print { body { background: #fff; } main { width: 100%; margin: 0; } .panel { border: 0; } }
@@ -229,6 +233,10 @@ function generateDoctorHistoryHtml(params) {
       <h1>便秘履歴</h1>
       <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
       <p><a href="${escapeHtml_(contextUrl)}" target="_blank" rel="noreferrer">ChatGPT貼り付け用テキストを開く</a></p>
+      <details>
+        <summary>ChatGPT貼り付け用テキストをページ内で表示</summary>
+        <pre>${escapeHtml_(contextText)}</pre>
+      </details>
       <section class="panel">
         <h2>受診・問診履歴</h2>
         ${visitItems}
@@ -314,7 +322,14 @@ function escapeHtml_(value) {
 }
 
 function buildSelfUrl_(action, patientId, limit) {
-  return `?action=${encodeURIComponent(action)}&patient_id=${encodeURIComponent(patientId)}&limit=${encodeURIComponent(limit)}`;
+  const query = `action=${encodeURIComponent(action)}&patient_id=${encodeURIComponent(patientId)}&limit=${encodeURIComponent(limit)}`;
+  try {
+    const serviceUrl = ScriptApp.getService().getUrl();
+    if (serviceUrl) return `${serviceUrl}?${query}`;
+  } catch (error) {
+    // Local syntax checks do not provide ScriptApp.
+  }
+  return `?${query}`;
 }
 
 function formatSimpleRowsForContext_(rows, keys) {

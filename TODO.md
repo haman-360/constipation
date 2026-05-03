@@ -85,8 +85,9 @@
 
 ## 次に検討
 
-- [ ] 医師側履歴確認URLの動作テスト
-- [ ] `chatGPTContext` 出力の実データ確認
+- [x] 医師側履歴確認URLの動作テスト
+- [x] `chatGPTContext` 出力の実データ確認
+- [x] 医師側履歴を読みやすく表示するHTML出力
 - [x] 医師側履歴確認URL作成ページ
 - [x] 患者ID・visit_token入りURL/QR作成ページ
 - [x] iPhoneのQR読み取りからSheets保存成功確認

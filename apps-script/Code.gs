@@ -91,6 +91,9 @@ function doGet(e) {
     if (action === "chatGPTContext") {
       return textResponse_(generateChatGPTContext(e.parameter || {}));
     }
+    if (action === "doctorHistory") {
+      return htmlResponse_(generateDoctorHistoryHtml(e.parameter || {}));
+    }
     throw new Error(`Unsupported action: ${action}`);
   } catch (error) {
     return jsonResponse_({ ok: false, error: String(error.message || error) }, 400);
@@ -189,6 +192,64 @@ function generateChatGPTContext(params) {
   return lines.join("\n");
 }
 
+function generateDoctorHistoryHtml(params) {
+  const history = getPatientHistory(params);
+  const contextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5));
+  const visitItems = history.visits.length
+    ? history.visits.map(formatVisitHtml_).join("")
+    : "<p>受診・問診履歴はありません。</p>";
+  return `
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>便秘履歴 ${escapeHtml_(history.patient_id)}</title>
+    <style>
+      body { margin: 0; background: #f4f7f9; color: #20242a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      main { width: min(960px, calc(100% - 32px)); margin: 28px auto; }
+      h1 { margin: 0 0 8px; font-size: 1.7rem; }
+      h2 { margin: 0 0 12px; font-size: 1.1rem; }
+      p { line-height: 1.7; }
+      .panel { margin-top: 16px; padding: 18px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fff; }
+      .meta { color: #5d6673; }
+      .visit { border-top: 1px solid #d9e0e8; padding-top: 14px; margin-top: 14px; }
+      .visit:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+      .headline { font-weight: 800; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .item { padding: 10px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
+      .label { display: block; color: #5d6673; font-size: .86rem; }
+      a { color: #07576b; font-weight: 800; }
+      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+      @media print { body { background: #fff; } main { width: 100%; margin: 0; } .panel { border: 0; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>便秘履歴</h1>
+      <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
+      <p><a href="${escapeHtml_(contextUrl)}" target="_blank" rel="noreferrer">ChatGPT貼り付け用テキストを開く</a></p>
+      <section class="panel">
+        <h2>受診・問診履歴</h2>
+        ${visitItems}
+      </section>
+      <section class="panel">
+        <h2>処方履歴</h2>
+        ${formatSimpleRowsHtml_(history.prescriptions, ["date", "medicine_name", "dose", "instruction", "doctor_note"])}
+      </section>
+      <section class="panel">
+        <h2>トイレトレーニング履歴</h2>
+        ${formatSimpleRowsHtml_(history.toilet_training, ["date", "training_status", "diaper_status", "toilet_refusal", "note"])}
+      </section>
+      <section class="panel">
+        <h2>週次日誌</h2>
+        ${formatSimpleRowsHtml_(history.diary_weekly, ["period_start", "period_end", "recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "note"])}
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
 function formatVisitsForContext_(visits) {
   if (!visits.length) return ["- なし"];
   return visits.map((visit, index) => {
@@ -203,6 +264,57 @@ function formatVisitsForContext_(visits) {
       visit.doctor_note ? `   医師メモ: ${visit.doctor_note}` : "",
     ].filter(Boolean).join("\n");
   });
+}
+
+function formatVisitHtml_(visit) {
+  const questionnaire = visit.questionnaire || {};
+  const diary = visit.diary || {};
+  return `
+    <article class="visit">
+      <p class="headline">${escapeHtml_(visit.submitted_at || visit.saved_at || "日付不明")} / ${escapeHtml_(visit.urgency_label || "区分不明")}</p>
+      <p>${escapeHtml_(visit.headline || "概要未記録")}</p>
+      <div class="grid">
+        ${htmlItem_("最終排便", questionnaire.q1_last_bowel_movement)}
+        ${htmlItem_("排便頻度", questionnaire.q2_bowel_frequency)}
+        ${htmlItem_("便の硬さ", questionnaire.q3_stool_consistency)}
+        ${htmlItem_("痛み", questionnaire.q4_pain)}
+        ${htmlItem_("がまん", questionnaire.q5_withholding)}
+        ${htmlItem_("薬", questionnaire.q6_med_status)}
+        ${htmlItem_("日誌記録", diary.diary_days_recorded === undefined ? "" : `${diary.diary_days_recorded}日`)}
+        ${htmlItem_("排便あり", diary.diary_bowel_days === undefined ? "" : `${diary.diary_bowel_days}日`)}
+        ${htmlItem_("最長無排便", diary.diary_longest_no_bowel_days === undefined ? "" : `${diary.diary_longest_no_bowel_days}日`)}
+        ${htmlItem_("硬い便", diary.diary_hard_days === undefined ? "" : `${diary.diary_hard_days}日`)}
+        ${htmlItem_("痛みの日", diary.diary_pain_days === undefined ? "" : `${diary.diary_pain_days}日`)}
+        ${htmlItem_("内服できた日", diary.diary_med_taken_days === undefined ? "" : `${diary.diary_med_taken_days}日`)}
+      </div>
+    </article>`;
+}
+
+function formatSimpleRowsHtml_(rows, keys) {
+  if (!rows.length) return "<p>なし</p>";
+  return rows.map((row) => `
+    <article class="visit">
+      <div class="grid">
+        ${keys.map((key) => htmlItem_(key, row[key])).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+function htmlItem_(label, value) {
+  return `<div class="item"><span class="label">${escapeHtml_(label)}</span><strong>${escapeHtml_(cellText_(value))}</strong></div>`;
+}
+
+function escapeHtml_(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildSelfUrl_(action, patientId, limit) {
+  return `?action=${encodeURIComponent(action)}&patient_id=${encodeURIComponent(patientId)}&limit=${encodeURIComponent(limit)}`;
 }
 
 function formatSimpleRowsForContext_(rows, keys) {
@@ -264,10 +376,11 @@ function readSheetObjects_(sheetName, headers) {
 }
 
 function parseVisitRow_(row) {
+  const { questionnaire_json, diary_json, ...visit } = row;
   return {
-    ...row,
-    questionnaire: parseJsonCell_(row.questionnaire_json),
-    diary: parseJsonCell_(row.diary_json),
+    ...visit,
+    questionnaire: parseJsonCell_(questionnaire_json),
+    diary: parseJsonCell_(diary_json),
   };
 }
 
@@ -377,4 +490,10 @@ function textResponse_(body) {
   const output = ContentService.createTextOutput(body);
   output.setMimeType(ContentService.MimeType.TEXT);
   return output;
+}
+
+function htmlResponse_(body) {
+  return HtmlService.createHtmlOutput(body)
+    .setTitle("便秘履歴")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

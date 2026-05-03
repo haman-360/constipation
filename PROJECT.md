@@ -184,7 +184,9 @@ MVP → Google Sheets連携の動作確認済み段階
 - `Code.gs` は単独Apps Scriptでも動くよう `SPREADSHEET_ID` 指定に対応。
 - Sheets表示改善として列幅、折り返し、固定列、JSON列非表示を追加。
 - `visit-link.html` で、患者ID・来院トークン入りの問診URLとQRを作成可能。
+- `history-link.html` で、医師用履歴表示、患者履歴JSON、ChatGPT貼り付け用テキストの確認URLを作成可能。
 - Macからの患者ID入りURL入力、iPhoneでのQR読み取りの双方で `visits` 保存成功を確認。
+- テスト患者の `patientHistory` と `chatGPTContext` の実データ出力確認済み。
 - ローカルテストでは `127.0.0.1` は端末自身を指すため、iPhone読み取り用QRにはMacのLAN内IPアドレス（例: `192.168.11.3`）を使う。
 - `index.html` を患者ID・来院トークンなしで直接開いた場合は、Sheets保存対象外として扱う。
 

@@ -17,6 +17,8 @@ const els = {
   message: document.getElementById("historyToolMessage"),
 };
 
+const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
+
 function sanitizePatientId(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 5);
 }
@@ -120,7 +122,7 @@ function fallbackCopyText(text) {
   textarea.remove();
 }
 
-els.webAppUrl.value = localStorage.getItem("constipation_web_app_url") || "";
+els.webAppUrl.value = localStorage.getItem("constipation_web_app_url") || DEFAULT_WEB_APP_URL;
 
 [els.patientId, els.limit, els.webAppUrl].forEach((input) => {
   input.addEventListener("input", () => {

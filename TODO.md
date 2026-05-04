@@ -112,6 +112,7 @@
 - [x] GitHub Pages固定URL公開テスト手順の作成
 - [ ] GitHub Pagesで問診HTMLを固定URL公開するテスト
 - [ ] GitHub Pages公開URLで受付QR作成、iPhone問診、Sheets保存をテスト
+- [x] GitHub Pages版history-link.htmlのWeb App URL既定値設定
 - [ ] GitHub Pages運用時のWeb App URL露出と公開範囲を再確認
 - [ ] 追加の医療者レビュー後修正
 

@@ -98,7 +98,7 @@ http://localhost:8000/history-link.html
 使い方:
 
 1. `患者ID` に5桁のテスト患者IDを入力する。先頭ゼロがある場合は省略しない。
-2. `Google Apps Script Web App URL` にデプロイ済みの `/exec` URLを入力する。
+2. `Google Apps Script Web App URL` は通常変更不要。Web Appを再作成してURLが変わった場合だけ、デプロイ済みの `/exec` URLを入力する。
 3. `医師入力を開く` で処方履歴とトイレトレーニング履歴を必要時に追記する。
    - 処方履歴とトイレトレーニング履歴は同じ患者に両方保存できる。
    - 両方を入力した場合は `両方とも保存`、片方だけの場合は個別保存ボタンを使う。

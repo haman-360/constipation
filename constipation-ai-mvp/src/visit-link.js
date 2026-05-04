@@ -26,7 +26,7 @@ function defaultBaseUrl() {
 }
 
 function sanitizePatientId(value) {
-  return String(value || "").replace(/\D/g, "").slice(0, 12);
+  return String(value || "").replace(/\D/g, "").slice(0, 5);
 }
 
 function sanitizeToken(value) {
@@ -55,18 +55,21 @@ function updateOutput() {
   els.patientId.value = sanitizePatientId(els.patientId.value);
   els.visitToken.value = sanitizeToken(els.visitToken.value);
   const { patientId, visitToken, url } = buildVisitUrl();
-  els.visitUrlOutput.textContent = url;
-  els.qrPatientLabel.textContent = patientId ? `患者ID: ${patientId}` : "患者ID未入力";
-  els.qrTokenLabel.textContent = visitToken ? `来院トークン: ${visitToken}` : "来院トークン未入力";
-
-  const ready = Boolean(patientId && visitToken);
+  const ready = Boolean(patientId.length === 5 && visitToken);
   els.copyUrlButton.disabled = !ready;
 
   if (!ready) {
+    els.visitUrlOutput.textContent = "患者IDを5桁で入力するとURLを作成します。";
+    els.qrPatientLabel.textContent = patientId ? "患者IDは5桁で入力" : "患者ID未入力";
+    els.qrTokenLabel.textContent = visitToken ? `来院トークン: ${visitToken}` : "来院トークン未入力";
     els.qrOutput.innerHTML = "";
-    els.message.textContent = "患者IDと来院トークンを入力してください。";
+    els.message.textContent = "患者IDは5桁で入力してください。";
     return;
   }
+
+  els.visitUrlOutput.textContent = url;
+  els.qrPatientLabel.textContent = `患者ID: ${patientId}`;
+  els.qrTokenLabel.textContent = `来院トークン: ${visitToken}`;
 
   try {
     els.qrOutput.innerHTML = makeQrSvg(url);
@@ -79,8 +82,8 @@ function updateOutput() {
 
 async function copyUrl() {
   const { patientId, visitToken, url } = buildVisitUrl();
-  if (!patientId || !visitToken) {
-    els.message.textContent = "患者IDと来院トークンを入力してください。";
+  if (patientId.length !== 5 || !visitToken) {
+    els.message.textContent = "患者IDは5桁で入力してください。";
     return;
   }
   try {

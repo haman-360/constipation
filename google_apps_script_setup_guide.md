@@ -7,7 +7,7 @@
 3. Apps Script の `Code.gs` 先頭に設定する。
 
 ```js
-const SPREADSHEET_ID = "ここにSpreadsheet ID";
+const SPREADSHEET_ID = "1DhLgt58Najnhie3C5RtwgcQwZVwjMykGrRLhfRTGurM";
 ```
 
 Google Sheetsから `拡張機能 > Apps Script` で開いたコンテナバインド型の場合は空でも動くことがあるが、単独Apps Scriptプロジェクトでは Spreadsheet ID が必要。
@@ -54,7 +54,7 @@ http://localhost:8000/visit-link.html
 
 使い方:
 
-1. `患者ID` を入力する。
+1. `患者ID` を5桁で入力する。先頭ゼロがある場合は省略しない。
 2. `来院トークン` は自動生成される。必要なら `生成` で作り直す。
 3. `問診アプリURL` はローカル確認なら `http://localhost:8000/index.html`、公開後は実際の問診アプリURLにする。
 4. `URLコピー` または `印刷` で、患者に渡すURL/QRを作る。
@@ -66,6 +66,13 @@ http://localhost:8000/index.html?patient_id=12345&visit_token=A7K2
 ```
 
 注意: `127.0.0.1` は開いている端末自身を指すため、iPhoneで読むQRには使えない。iPhoneからMac上のローカルサーバーを開く場合は、MacとiPhoneを同じWi-Fiに接続し、問診アプリURLを `http://MacのIPアドレス:8001/index.html` の形にする。例: `http://192.168.11.3:8001/index.html`。
+
+GitHub Pagesで公開した後は、固定URLの `visit-link.html` を開く。受付ページをGitHub Pages上で開くと、詳細設定の問診アプリURLは同じGitHub Pages上の `index.html` になる。
+
+```text
+https://haman-360.github.io/constipation/constipation-ai-mvp/visit-link.html
+https://haman-360.github.io/constipation/constipation-ai-mvp/index.html
+```
 
 `submit_url` は長いため、QRには基本的に含めない。現在のHTMLアプリにはWeb App URLを既定値として設定しているため、`patient_id` と `visit_token` だけのURLでもSheets保存を試行する。院内運用前には、Web App URLと公開範囲を確認する。
 
@@ -90,16 +97,22 @@ http://localhost:8000/history-link.html
 
 使い方:
 
-1. `患者ID` にテスト患者IDを入力する。
+1. `患者ID` に5桁のテスト患者IDを入力する。先頭ゼロがある場合は省略しない。
 2. `Google Apps Script Web App URL` にデプロイ済みの `/exec` URLを入力する。
-3. `医師用履歴表示を開く` で診察前に見やすい履歴画面を確認する。
+3. `医師入力を開く` で処方履歴とトイレトレーニング履歴を必要時に追記する。
+   - 処方履歴とトイレトレーニング履歴は同じ患者に両方保存できる。
+   - 両方を入力した場合は `両方とも保存`、片方だけの場合は個別保存ボタンを使う。
+   - 処方履歴とトイレトレーニング履歴の `date` は日時（`yyyy-MM-dd HH:mm:ss`）で保存される。
+   - 保存後は医師入力画面に戻る。ブラウザ更新で同じ内容が再送信されないことを確認する。
+4. `医師用履歴表示を開く` で診察前に見やすい履歴画面を確認する。
    - 画面内の `ChatGPT貼り付け用テキストをページ内で表示` からも内容を確認できる。
-4. `患者履歴JSONを開く` で `patientHistory` の応答を確認する。
-5. `ChatGPT用テキストを開く` で `chatGPTContext` の出力を確認する。
+5. `患者履歴JSONを開く` で `patientHistory` の応答を確認する。
+6. `ChatGPT用テキストを開く` で `chatGPTContext` の出力を確認する。
 
 作成されるURL例:
 
 ```text
+https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=doctorEntry&patient_id=99999&limit=5
 https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=doctorHistory&patient_id=99999&limit=5
 https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=patientHistory&patient_id=99999&limit=5
 https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=chatGPTContext&patient_id=99999&limit=5

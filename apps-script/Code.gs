@@ -68,17 +68,40 @@ const DIARY_WEEKLY_HEADERS = [
   "note",
 ];
 
+const HISTORY_LABELS = {
+  date: "日時",
+  medicine_name: "薬剤名",
+  dose: "量",
+  instruction: "指示内容",
+  doctor_note: "医師メモ",
+  training_status: "トレーニング状況",
+  diaper_status: "おむつ・パンツ",
+  toilet_refusal: "トイレ拒否",
+  note: "メモ",
+  period_start: "開始日",
+  period_end: "終了日",
+  recorded_days: "記録日数",
+  bowel_days: "排便あり",
+  longest_no_bowel_days: "最長無排便",
+  hard_days: "硬い便",
+  pain_days: "痛みの日",
+  withholding_days: "がまんの日",
+  soiling_days: "便もれ",
+  med_taken_days: "内服できた日",
+};
+
 const SHEET_DEFINITIONS = [
-  { name: SHEET_NAMES.patients, headers: PATIENTS_HEADERS, widths: [110, 90, 105, 160, 260] },
+  { name: SHEET_NAMES.patients, headers: PATIENTS_HEADERS, widths: [110, 90, 105, 160, 260], plainTextHeaders: ["patient_id"] },
   {
     name: SHEET_NAMES.visits,
     headers: VISITS_HEADERS,
     widths: [170, 95, 95, 175, 175, 105, 120, 300, 260, 180, 420, 420, 360, 130, 260],
     hiddenHeaders: ["questionnaire_json", "diary_json"],
+    plainTextHeaders: ["visit_id", "patient_id", "visit_token"],
   },
-  { name: SHEET_NAMES.prescriptions, headers: PRESCRIPTIONS_HEADERS, widths: [150, 95, 120, 160, 140, 260, 260] },
-  { name: SHEET_NAMES.toiletTraining, headers: TOILET_TRAINING_HEADERS, widths: [95, 120, 150, 140, 140, 260] },
-  { name: SHEET_NAMES.diaryWeekly, headers: DIARY_WEEKLY_HEADERS, widths: [95, 120, 120, 110, 110, 160, 100, 100, 125, 125, 130, 260] },
+  { name: SHEET_NAMES.prescriptions, headers: PRESCRIPTIONS_HEADERS, widths: [150, 95, 170, 160, 140, 260, 260], plainTextHeaders: ["prescription_id", "patient_id"], dateTimeHeaders: ["date"] },
+  { name: SHEET_NAMES.toiletTraining, headers: TOILET_TRAINING_HEADERS, widths: [95, 170, 150, 140, 140, 260], plainTextHeaders: ["patient_id"], dateTimeHeaders: ["date"] },
+  { name: SHEET_NAMES.diaryWeekly, headers: DIARY_WEEKLY_HEADERS, widths: [95, 120, 120, 110, 110, 160, 100, 100, 125, 125, 130, 260], plainTextHeaders: ["patient_id"] },
 ];
 
 
@@ -94,6 +117,9 @@ function doGet(e) {
     if (action === "doctorHistory") {
       return htmlResponse_(generateDoctorHistoryHtml(e.parameter || {}));
     }
+    if (action === "doctorEntry") {
+      return htmlResponse_(generateDoctorEntryHtml(e.parameter || {}));
+    }
     throw new Error(`Unsupported action: ${action}`);
   } catch (error) {
     return jsonResponse_({ ok: false, error: String(error.message || error) }, 400);
@@ -101,19 +127,37 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  const params = (e && e.parameter) || {};
   try {
+    if (params.action === "savePrescription") {
+      savePrescription_(params);
+      return redirectResponse_(buildSelfUrl_("doctorEntry", requirePatientId_(params.patient_id), 5, { message: "処方履歴を保存しました。" }));
+    }
+    if (params.action === "saveToiletTraining") {
+      saveToiletTraining_(params);
+      return redirectResponse_(buildSelfUrl_("doctorEntry", requirePatientId_(params.patient_id), 5, { message: "トイレトレーニング履歴を保存しました。" }));
+    }
+    if (params.action === "saveDoctorEntries") {
+      const saved = saveDoctorEntries_(params);
+      return redirectResponse_(buildSelfUrl_("doctorEntry", requirePatientId_(params.patient_id), 5, { message: saved.join("、") + "を保存しました。" }));
+    }
     const payload = parseJsonBody_(e);
     const result = submitVisit(payload);
     return jsonResponse_(result);
   } catch (error) {
+    if (params.action && params.patient_id) {
+      const patientId = normalizePatientId_(params.patient_id);
+      if (patientId.length === 5) {
+        return redirectResponse_(buildSelfUrl_("doctorEntry", patientId, 5, { message: `保存できませんでした: ${String(error.message || error)}` }));
+      }
+    }
     return jsonResponse_({ ok: false, error: String(error.message || error) }, 400);
   }
 }
 
 function submitVisit(payload) {
   validateSubmitVisitPayload_(payload);
-  const patientId = normalizePatientId_(payload.patient_id);
-  if (!patientId) throw new Error("patient_id must contain digits.");
+  const patientId = requirePatientId_(payload.patient_id);
   const sheet = getOrCreateSheet_(SHEET_NAMES.visits, VISITS_HEADERS);
   const savedAt = new Date().toISOString();
   const outputs = payload.outputs || {};
@@ -146,6 +190,79 @@ function submitVisit(payload) {
     patient_saved: patientSaved,
     diary_weekly_saved: diaryWeeklySaved,
   };
+}
+
+function savePrescription_(params) {
+  const patientId = requirePatientId_(params.patient_id);
+  const savedAt = new Date().toISOString();
+  const date = dateTimeInScriptTimezone_(params.prescription_date || params.date || savedAt);
+  const medicineName = String(params.medicine_name || "").trim();
+  if (!medicineName) throw new Error("薬剤名を入力してください。");
+  upsertPatient_(patientId, savedAt);
+  const sheet = getOrCreateSheet_(SHEET_NAMES.prescriptions, PRESCRIPTIONS_HEADERS);
+  sheet.appendRow([
+    params.prescription_id || generateRowId_("RX", patientId, date),
+    patientId,
+    date,
+    medicineName,
+    String(params.dose || "").trim(),
+    String(params.instruction || "").trim(),
+    String(params.doctor_note || "").trim(),
+  ]);
+}
+
+function saveToiletTraining_(params) {
+  const patientId = requirePatientId_(params.patient_id);
+  const savedAt = new Date().toISOString();
+  const date = dateTimeInScriptTimezone_(params.training_date || params.date || savedAt);
+  if (!hasToiletTrainingInput_(params)) throw new Error("トイレトレーニング履歴の内容を入力してください。");
+  upsertPatient_(patientId, savedAt);
+  const sheet = getOrCreateSheet_(SHEET_NAMES.toiletTraining, TOILET_TRAINING_HEADERS);
+  sheet.appendRow([
+    patientId,
+    date,
+    String(params.training_status || "").trim(),
+    String(params.diaper_status || "").trim(),
+    String(params.toilet_refusal || "").trim(),
+    String(params.note || "").trim(),
+  ]);
+}
+
+function saveDoctorEntries_(params) {
+  const saved = [];
+  if (hasPrescriptionInput_(params)) {
+    savePrescription_(params);
+    saved.push("処方履歴");
+  }
+  if (hasToiletTrainingInput_(params)) {
+    saveToiletTraining_(params);
+    saved.push("トイレトレーニング履歴");
+  }
+  if (!saved.length) throw new Error("保存する処方履歴またはトイレトレーニング履歴を入力してください。");
+  return saved;
+}
+
+function savePrescriptionFromDoctorForm(formObject) {
+  savePrescription_(formObject || {});
+  return { ok: true, message: "処方履歴を保存しました。" };
+}
+
+function saveToiletTrainingFromDoctorForm(formObject) {
+  saveToiletTraining_(formObject || {});
+  return { ok: true, message: "トイレトレーニング履歴を保存しました。" };
+}
+
+function saveDoctorEntriesFromDoctorForm(formObject) {
+  const saved = saveDoctorEntries_(formObject || {});
+  return { ok: true, message: `${saved.join("、")}を保存しました。` };
+}
+
+function hasPrescriptionInput_(params) {
+  return ["medicine_name", "dose", "instruction", "doctor_note"].some((key) => String(params[key] || "").trim());
+}
+
+function hasToiletTrainingInput_(params) {
+  return ["training_status", "diaper_status", "toilet_refusal", "note"].some((key) => String(params[key] || "").trim());
 }
 
 function upsertPatient_(patientId, createdAt) {
@@ -208,6 +325,32 @@ function dateOnlyInScriptTimezone_(value) {
   }
 }
 
+function dateTimeInScriptTimezone_(value) {
+  const text = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
+    const compact = text.slice(0, 19).replace("T", " ");
+    return compact.length === 16 ? `${compact}:00` : compact;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return `${text} 00:00:00`;
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  try {
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  } catch (error) {
+    return date.toISOString().slice(0, 19).replace("T", " ");
+  }
+}
+
+function dateTimeInputValue_(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  try {
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm");
+  } catch (error) {
+    return date.toISOString().slice(0, 16);
+  }
+}
+
 function addDays_(dateText, days) {
   if (!dateText) return "";
   const date = new Date(`${dateText}T00:00:00Z`);
@@ -248,13 +391,13 @@ function generateChatGPTContext(params) {
     ...formatVisitsForContext_(history.visits),
     "",
     "【処方履歴】",
-    ...formatSimpleRowsForContext_(history.prescriptions, ["date", "medicine_name", "dose", "instruction", "doctor_note"]),
+    ...formatSimpleRowsForContext_(history.prescriptions, ["date", "medicine_name", "dose", "instruction", "doctor_note"], HISTORY_LABELS),
     "",
     "【トイレトレーニング履歴】",
-    ...formatSimpleRowsForContext_(history.toilet_training, ["date", "training_status", "diaper_status", "toilet_refusal", "note"]),
+    ...formatSimpleRowsForContext_(history.toilet_training, ["date", "training_status", "diaper_status", "toilet_refusal", "note"], HISTORY_LABELS),
     "",
     "【週次日誌】",
-    ...formatSimpleRowsForContext_(history.diary_weekly, ["period_start", "period_end", "recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "note"]),
+    ...formatSimpleRowsForContext_(history.diary_weekly, ["period_start", "period_end", "recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "note"], HISTORY_LABELS),
     "",
     "【医師に整理してほしい観点】",
     "- 前回から改善した点",
@@ -270,7 +413,9 @@ function generateChatGPTContext(params) {
 function generateDoctorHistoryHtml(params) {
   const history = getPatientHistory(params);
   const contextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5));
+  const entryUrl = buildSelfUrl_("doctorEntry", history.patient_id, normalizeLimit_(params.limit, 5));
   const contextText = generateChatGPTContext(params);
+  const preVisitItems = formatPreVisitItemsHtml_(history);
   const visitItems = history.visits.length
     ? history.visits.map(formatVisitHtml_).join("")
     : "<p>受診・問診履歴はありません。</p>";
@@ -282,6 +427,7 @@ function generateDoctorHistoryHtml(params) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>便秘履歴 ${escapeHtml_(history.patient_id)}</title>
     <style>
+      * { box-sizing: border-box; }
       body { margin: 0; background: #f4f7f9; color: #20242a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       main { width: min(960px, calc(100% - 32px)); margin: 28px auto; }
       h1 { margin: 0 0 8px; font-size: 1.7rem; }
@@ -295,8 +441,14 @@ function generateDoctorHistoryHtml(params) {
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
       .item { padding: 10px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
       .label { display: block; color: #5d6673; font-size: .86rem; }
+      .summary-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+      .summary-list li { padding: 12px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; line-height: 1.65; }
+      .summary-list strong { display: block; margin-bottom: 4px; }
       details { margin-top: 16px; }
       summary { color: #07576b; cursor: pointer; font-weight: 800; }
+      .copy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+      button { min-height: 40px; padding: 8px 14px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+      .copy-status { color: #5d6673; }
       pre { overflow: auto; white-space: pre-wrap; line-height: 1.55; padding: 14px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
       a { color: #07576b; font-weight: 800; }
       @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
@@ -307,28 +459,254 @@ function generateDoctorHistoryHtml(params) {
     <main>
       <h1>便秘履歴</h1>
       <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
-      <p><a href="${escapeHtml_(contextUrl)}" target="_blank" rel="noreferrer">ChatGPT貼り付け用テキストを開く</a></p>
+      <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(contextUrl)}" target="_blank" rel="noreferrer">ChatGPT貼り付け用テキストを開く</a></p>
       <details>
         <summary>ChatGPT貼り付け用テキストをページ内で表示</summary>
-        <pre>${escapeHtml_(contextText)}</pre>
+        <div class="copy-row">
+          <button type="button" id="copyContextButton">テキストをコピー</button>
+          <span id="copyContextStatus" class="copy-status"></span>
+        </div>
+        <pre id="chatGPTContextText">${escapeHtml_(contextText)}</pre>
       </details>
+      <section class="panel">
+        <h2>診察前の確認</h2>
+        <ul class="summary-list">
+          ${preVisitItems}
+        </ul>
+      </section>
       <section class="panel">
         <h2>受診・問診履歴</h2>
         ${visitItems}
       </section>
       <section class="panel">
         <h2>処方履歴</h2>
-        ${formatSimpleRowsHtml_(history.prescriptions, ["date", "medicine_name", "dose", "instruction", "doctor_note"])}
+        ${formatSimpleRowsHtml_(history.prescriptions, ["date", "medicine_name", "dose", "instruction", "doctor_note"], HISTORY_LABELS)}
       </section>
       <section class="panel">
         <h2>トイレトレーニング履歴</h2>
-        ${formatSimpleRowsHtml_(history.toilet_training, ["date", "training_status", "diaper_status", "toilet_refusal", "note"])}
+        ${formatSimpleRowsHtml_(history.toilet_training, ["date", "training_status", "diaper_status", "toilet_refusal", "note"], HISTORY_LABELS)}
       </section>
       <section class="panel">
         <h2>週次日誌</h2>
-        ${formatSimpleRowsHtml_(history.diary_weekly, ["period_start", "period_end", "recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "note"])}
+        ${formatSimpleRowsHtml_(history.diary_weekly, ["period_start", "period_end", "recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "note"], HISTORY_LABELS)}
       </section>
     </main>
+    <script>
+      const copyContextButton = document.getElementById("copyContextButton");
+      const copyContextStatus = document.getElementById("copyContextStatus");
+      const chatGPTContextText = document.getElementById("chatGPTContextText");
+      if (copyContextButton && copyContextStatus && chatGPTContextText) {
+        copyContextButton.addEventListener("click", async () => {
+          const text = chatGPTContextText.textContent || "";
+          try {
+            await navigator.clipboard.writeText(text);
+            copyContextStatus.textContent = "コピーしました。";
+          } catch (error) {
+            copyContextStatus.textContent = "コピーできませんでした。表示テキストを選択してコピーしてください。";
+          }
+        });
+      }
+    </script>
+  </body>
+</html>`;
+}
+
+function formatPreVisitItemsHtml_(history) {
+  const latestVisit = history.visits[0];
+  const latestPrescription = history.prescriptions[0];
+  const latestTraining = history.toilet_training[0];
+  const latestDiary = history.diary_weekly[0];
+  const items = [
+    ["直近問診", latestVisit ? [
+      `${cellText_(latestVisit.submitted_at || latestVisit.saved_at)} / ${latestVisit.urgency_label || "区分不明"}`,
+      latestVisit.headline || "概要未記録",
+    ].join("。") : "なし"],
+    ["直近処方", latestPrescription ? [
+      cellText_(latestPrescription.date),
+      latestPrescription.medicine_name || "薬剤名未記録",
+      latestPrescription.dose ? `量: ${latestPrescription.dose}` : "",
+      latestPrescription.instruction ? `指示: ${latestPrescription.instruction}` : "",
+    ].filter(Boolean).join(" / ") : "なし"],
+    ["直近トイレトレーニング", latestTraining ? [
+      cellText_(latestTraining.date),
+      latestTraining.training_status ? `状況: ${latestTraining.training_status}` : "",
+      latestTraining.diaper_status ? `おむつ・パンツ: ${latestTraining.diaper_status}` : "",
+      latestTraining.toilet_refusal ? `拒否: ${latestTraining.toilet_refusal}` : "",
+    ].filter(Boolean).join(" / ") : "なし"],
+    ["直近週次日誌", latestDiary ? [
+      `${cellText_(latestDiary.period_start)}〜${cellText_(latestDiary.period_end)}`,
+      latestDiary.recorded_days !== "" ? `記録${latestDiary.recorded_days}日` : "",
+      latestDiary.bowel_days !== "" ? `排便${latestDiary.bowel_days}日` : "",
+      latestDiary.longest_no_bowel_days !== "" ? `最長無排便${latestDiary.longest_no_bowel_days}日` : "",
+      latestDiary.hard_days !== "" ? `硬い便${latestDiary.hard_days}日` : "",
+      latestDiary.pain_days !== "" ? `痛み${latestDiary.pain_days}日` : "",
+      latestDiary.med_taken_days !== "" ? `内服${latestDiary.med_taken_days}日` : "",
+    ].filter(Boolean).join(" / ") : "なし"],
+  ];
+  return items.map(([label, value]) => `<li><strong>${escapeHtml_(label)}</strong>${escapeHtml_(value)}</li>`).join("");
+}
+
+function generateDoctorEntryHtml(params) {
+  const patientId = requirePatientId_(params.patient_id);
+  const nowValue = dateTimeInputValue_(new Date());
+  const formAction = serviceUrl_();
+  const historyUrl = buildSelfUrl_("doctorHistory", patientId, normalizeLimit_(params.limit, 5));
+  return `
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>医師入力 ${escapeHtml_(patientId)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f4f7f9; color: #20242a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      main { width: min(960px, calc(100% - 32px)); margin: 28px auto; }
+      h1 { margin: 0 0 8px; font-size: 1.7rem; }
+      h2 { margin: 0 0 14px; font-size: 1.1rem; }
+      p { line-height: 1.7; }
+      .panel { margin-top: 16px; padding: 18px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fff; }
+      .panel:first-of-type { margin-top: 0; }
+      .meta { color: #5d6673; }
+      .notice { padding: 12px 14px; border: 1px solid #8db9c4; border-radius: 8px; background: #e2f3f6; color: #07576b; font-weight: 800; }
+      .notice.error { border-color: #d8a1a1; background: #fdecec; color: #8a2d2d; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
+      input, textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; }
+      textarea { min-height: 88px; resize: vertical; }
+      .wide { grid-column: 1 / -1; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+      button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+      button.secondary { border: 1px solid #d9e0e8; background: #fff; color: #20242a; }
+      a { color: #07576b; font-weight: 800; }
+      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>医師入力</h1>
+      <p class="meta">患者ID: ${escapeHtml_(patientId)}</p>
+      <p><a href="${escapeHtml_(historyUrl)}">便秘履歴へ戻る</a></p>
+      <p id="saveMessage" class="notice" ${params.message ? "" : "hidden"}>${params.message ? escapeHtml_(params.message) : ""}</p>
+
+      <form id="doctorEntryForm" method="post" action="${escapeHtml_(formAction)}" target="_top">
+        <input type="hidden" name="patient_id" value="${escapeHtml_(patientId)}">
+        <section class="panel">
+          <h2>処方履歴を追加</h2>
+          <div class="grid">
+            <label>処方日時
+              <input name="prescription_date" type="datetime-local" value="${escapeHtml_(nowValue)}">
+            </label>
+            <label>薬剤名
+              <input name="medicine_name" type="text" placeholder="例: モビコール">
+            </label>
+            <label>量
+              <input name="dose" type="text" placeholder="例: 1包/日">
+            </label>
+            <label class="wide">指示内容
+              <textarea name="instruction" placeholder="例: 便の様子を見ながら医師指示範囲で調整"></textarea>
+            </label>
+            <label class="wide">医師メモ
+              <textarea name="doctor_note"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>トイレトレーニング履歴を追加</h2>
+          <div class="grid">
+            <label>記録日時
+              <input name="training_date" type="datetime-local" value="${escapeHtml_(nowValue)}">
+            </label>
+            <label>トレーニング状況
+              <select name="training_status">
+                <option value=""></option>
+                <option>未開始</option>
+                <option>開始中</option>
+                <option>中断中</option>
+                <option>不明</option>
+              </select>
+            </label>
+            <label>おむつ・パンツ
+              <select name="diaper_status">
+                <option value=""></option>
+                <option>おむつ</option>
+                <option>パンツ</option>
+                <option>併用</option>
+                <option>不明</option>
+              </select>
+            </label>
+            <label>トイレ拒否
+              <select name="toilet_refusal">
+                <option value=""></option>
+                <option>なし</option>
+                <option>あり</option>
+                <option>強い</option>
+                <option>不明</option>
+              </select>
+            </label>
+            <label class="wide">メモ
+              <textarea name="note"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button type="button" data-save-action="both">両方とも保存</button>
+          <button class="secondary" type="button" data-save-action="prescription">処方履歴だけ保存</button>
+          <button class="secondary" type="button" data-save-action="toiletTraining">トイレトレーニング履歴だけ保存</button>
+        </div>
+      </form>
+    </main>
+    <script>
+      const form = document.getElementById("doctorEntryForm");
+      const message = document.getElementById("saveMessage");
+      const buttons = Array.from(document.querySelectorAll("[data-save-action]"));
+      const handlers = {
+        both: "saveDoctorEntriesFromDoctorForm",
+        prescription: "savePrescriptionFromDoctorForm",
+        toiletTraining: "saveToiletTrainingFromDoctorForm",
+      };
+
+      function setMessage(text, isError) {
+        message.textContent = text;
+        message.hidden = false;
+        message.classList.toggle("error", Boolean(isError));
+        message.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function formObject() {
+        const data = {};
+        new FormData(form).forEach((value, key) => {
+          data[key] = value;
+        });
+        return data;
+      }
+
+      function setBusy(isBusy) {
+        buttons.forEach((button) => {
+          button.disabled = isBusy;
+        });
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const handlerName = handlers[button.dataset.saveAction];
+          if (!handlerName) return;
+          setBusy(true);
+          setMessage("保存しています...", false);
+          google.script.run
+            .withSuccessHandler((result) => {
+              setBusy(false);
+              setMessage((result && result.message) || "保存しました。", false);
+            })
+            .withFailureHandler((error) => {
+              setBusy(false);
+              setMessage("保存できませんでした: " + (error && error.message ? error.message : error), true);
+            })[handlerName](formObject());
+        });
+      });
+    </script>
   </body>
 </html>`;
 }
@@ -373,12 +751,12 @@ function formatVisitHtml_(visit) {
     </article>`;
 }
 
-function formatSimpleRowsHtml_(rows, keys) {
+function formatSimpleRowsHtml_(rows, keys, labels) {
   if (!rows.length) return "<p>なし</p>";
   return rows.map((row) => `
     <article class="visit">
       <div class="grid">
-        ${keys.map((key) => htmlItem_(key, row[key])).join("")}
+        ${keys.map((key) => htmlItem_(labels && labels[key] ? labels[key] : key, displayValueForKey_(key, row[key]))).join("")}
       </div>
     </article>
   `).join("");
@@ -396,8 +774,17 @@ function escapeHtml_(value) {
     .replace(/"/g, "&quot;");
 }
 
-function buildSelfUrl_(action, patientId, limit) {
-  const query = `action=${encodeURIComponent(action)}&patient_id=${encodeURIComponent(patientId)}&limit=${encodeURIComponent(limit)}`;
+function buildSelfUrl_(action, patientId, limit, extraParams) {
+  const params = {
+    action,
+    patient_id: patientId,
+    limit,
+    ...(extraParams || {}),
+  };
+  const query = Object.keys(params)
+    .filter((key) => params[key] !== "" && params[key] !== null && params[key] !== undefined)
+    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+    .join("&");
   try {
     const serviceUrl = ScriptApp.getService().getUrl();
     if (serviceUrl) return `${serviceUrl}?${query}`;
@@ -407,14 +794,44 @@ function buildSelfUrl_(action, patientId, limit) {
   return `?${query}`;
 }
 
-function formatSimpleRowsForContext_(rows, keys) {
+function serviceUrl_() {
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (error) {
+    return "";
+  }
+}
+
+function generateRowId_(prefix, patientId, dateText) {
+  const datePart = String(dateText || "").replace(/\D/g, "") || dateOnlyInScriptTimezone_(new Date()).replace(/\D/g, "");
+  return `${prefix}-${datePart}-${patientId}-${Date.now()}`;
+}
+
+function formatSimpleRowsForContext_(rows, keys, labels) {
   if (!rows.length) return ["- なし"];
-  return rows.map((row, index) => `${index + 1}. ${keys.map((key) => `${key}=${cellText_(row[key])}`).join(", ")}`);
+  return rows.map((row, index) => `${index + 1}. ${keys.map((key) => `${labels && labels[key] ? labels[key] : key}=${cellText_(displayValueForKey_(key, row[key]))}`).join(", ")}`);
 }
 
 function cellText_(value) {
   if (value === "" || value === null || value === undefined) return "未記録";
+  if (value instanceof Date) return dateTimeInScriptTimezone_(value);
   return String(value);
+}
+
+function displayValueForKey_(key, value) {
+  if (value === "" || value === null || value === undefined) return "";
+  const dayCountKeys = [
+    "recorded_days",
+    "bowel_days",
+    "longest_no_bowel_days",
+    "hard_days",
+    "pain_days",
+    "withholding_days",
+    "soiling_days",
+    "med_taken_days",
+  ];
+  if (dayCountKeys.includes(key) && value !== "") return `${value}日`;
+  return value;
 }
 
 function setupSheets() {
@@ -495,6 +912,12 @@ function normalizePatientId_(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 5);
 }
 
+function requirePatientId_(value) {
+  const patientId = normalizePatientId_(value);
+  if (patientId.length !== 5) throw new Error("patient_id must be 5 digits.");
+  return patientId;
+}
+
 function normalizeLimit_(value, fallback) {
   const limit = Number.parseInt(value, 10);
   if (!Number.isFinite(limit) || limit <= 0) return fallback;
@@ -544,6 +967,8 @@ function formatTemplateSheet_(sheet, definition) {
   }
 
   applyColumnWidths_(sheet, headers, definition.widths || []);
+  applyPlainTextColumns_(sheet, headers, definition.plainTextHeaders || []);
+  applyDateTimeColumns_(sheet, headers, definition.dateTimeHeaders || []);
   hideColumnsByHeader_(sheet, headers, definition.hiddenHeaders || []);
   if (!sheet.getFilter()) {
     fullRange.createFilter();
@@ -555,6 +980,39 @@ function applyColumnWidths_(sheet, headers, widths) {
     const width = widths[index] || 120;
     sheet.setColumnWidth(index + 1, width);
   });
+}
+
+function applyPlainTextColumns_(sheet, headers, plainTextHeaders) {
+  headers.forEach((header, index) => {
+    if (plainTextHeaders.includes(header)) {
+      const column = index + 1;
+      sheet.getRange(1, column, sheet.getMaxRows(), 1)
+        .setNumberFormat("@")
+        .setHorizontalAlignment("left");
+      normalizePlainTextColumnValues_(sheet, header, column);
+    }
+  });
+}
+
+function applyDateTimeColumns_(sheet, headers, dateTimeHeaders) {
+  headers.forEach((header, index) => {
+    if (dateTimeHeaders.includes(header)) {
+      sheet.getRange(2, index + 1, sheet.getMaxRows() - 1, 1)
+        .setNumberFormat("yyyy-mm-dd hh:mm:ss");
+    }
+  });
+}
+
+function normalizePlainTextColumnValues_(sheet, header, column) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const range = sheet.getRange(2, column, lastRow - 1, 1);
+  const values = range.getDisplayValues().map(([value]) => {
+    const text = String(value || "").trim();
+    if (header === "patient_id" && /^\d{1,5}$/.test(text)) return [text.padStart(5, "0")];
+    return [text];
+  });
+  range.setValues(values);
 }
 
 function hideColumnsByHeader_(sheet, headers, hiddenHeaders) {
@@ -586,4 +1044,24 @@ function htmlResponse_(body) {
   return HtmlService.createHtmlOutput(body)
     .setTitle("便秘履歴")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function redirectResponse_(url) {
+  const safeUrl = escapeHtml_(url);
+  const scriptUrl = JSON.stringify(url);
+  return HtmlService.createHtmlOutput(`
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>保存しました</title>
+    <script>
+      window.top.location.replace(${scriptUrl});
+    </script>
+  </head>
+  <body>
+    <p><a href="${safeUrl}">保存後の画面へ移動します</a></p>
+  </body>
+</html>`);
 }

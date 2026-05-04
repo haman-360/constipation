@@ -16,8 +16,8 @@
 
         <div class="link-tool__grid">
           <label class="link-field">
-            <span>患者ID</span>
-            <input id="patientIdInput" type="text" inputmode="numeric" maxlength="12" placeholder="例: 12345" />
+            <span>患者ID（5桁）</span>
+            <input id="patientIdInput" type="text" inputmode="numeric" maxlength="5" placeholder="例: 00100" />
           </label>
           <label class="link-field">
             <span>取得件数</span>
@@ -35,10 +35,17 @@
         </details>
 
         <div class="link-tool__actions">
+          <button id="copyEntryButton" class="button" type="button">医師入力URLコピー</button>
           <button id="copyDoctorButton" class="button" type="button">医師用URLコピー</button>
           <button id="copyHistoryButton" class="button" type="button">履歴URLコピー</button>
           <button id="copyContextButton" class="button button--secondary" type="button">ChatGPT用URLコピー</button>
         </div>
+
+        <section class="link-output">
+          <h2>医師入力</h2>
+          <pre id="entryUrlOutput"></pre>
+          <p><a id="entryOpenLink" href="#" target="_blank" rel="noreferrer">医師入力を開く</a></p>
+        </section>
 
         <section class="link-output">
           <h2>医師用履歴表示</h2>
@@ -62,6 +69,6 @@
       </section>
     </main>
 
-    <script src="./src/history-link.js?v=20260503-2"></script>
+    <script src="./src/history-link.js?v=20260503-4"></script>
   </body>
 </html>

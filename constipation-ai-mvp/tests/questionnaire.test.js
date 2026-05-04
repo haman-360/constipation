@@ -1226,6 +1226,18 @@ const visitMetaCases = [
     },
     expected: {},
   },
+  {
+    id: "VISIT-META-OMITS-SHORT-ID",
+    input: {
+      patient_id: "1234",
+      visit_token: "A7K2",
+      submitted_at: "2026-05-03T10:15:00+09:00",
+    },
+    expected: {
+      visit_token: "A7K2",
+      submitted_at: "2026-05-03T10:15:00+09:00",
+    },
+  },
 ];
 
 for (const visitMetaCase of visitMetaCases) {

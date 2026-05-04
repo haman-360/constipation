@@ -90,7 +90,17 @@
 - [x] 医師側履歴を読みやすく表示するHTML出力
 - [x] `submitVisit` 時の `patients` 自動登録
 - [x] `submitVisit` 時の `diary_weekly` 自動保存
+- [x] 受付用QR作成ページの患者IDを5桁に制限
+- [x] SheetsのID列を文字列形式に固定
 - [x] `prescriptions` / `toilet_training` は医師入力として自動生成しない方針を明記
+- [x] 医師側の処方履歴入力フォーム
+- [x] 医師側のトイレトレーニング履歴入力フォーム
+- [x] 医師入力フォームの「両方とも保存」ボタン
+- [x] 医師入力フォーム保存後の白紙表示・再読み込み重複対策
+- [x] 処方履歴・トイレトレーニング履歴の日時保存
+- [x] 便秘履歴ページの処方・トイレトレーニング・週次日誌を日本語ラベル表示
+- [x] 便秘履歴ページ上部に診察前確認サマリーを追加
+- [x] 便秘履歴ページ内のChatGPT貼り付け用テキストコピー
 - [x] 医師側履歴確認URL作成ページ
 - [x] 患者ID・visit_token入りURL/QR作成ページ
 - [x] iPhoneのQR読み取りからSheets保存成功確認
@@ -99,6 +109,10 @@
 - [x] URL/QR作成ページの問診アプリURL欄を詳細設定化または非表示化
 - [x] 問診HTMLの公開方法を決める（院内端末のみ / GitHub Pages等 / Apps Script HTML化）
 - [x] Web App公開範囲の院内運用検討
+- [x] GitHub Pages固定URL公開テスト手順の作成
+- [ ] GitHub Pagesで問診HTMLを固定URL公開するテスト
+- [ ] GitHub Pages公開URLで受付QR作成、iPhone問診、Sheets保存をテスト
+- [ ] GitHub Pages運用時のWeb App URL露出と公開範囲を再確認
 - [ ] 追加の医療者レビュー後修正
 
 

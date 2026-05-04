@@ -11,13 +11,13 @@
       <section class="link-tool panel">
         <div class="link-tool__header">
           <h1>受付用QR作成</h1>
-          <p>患者IDを入力すると、来院トークン入りの問診QRを作成します。QRはこの端末内で生成されます。</p>
+          <p>5桁の患者IDを入力すると、来院トークン入りの問診QRを作成します。QRはこの端末内で生成されます。</p>
         </div>
 
         <div class="link-tool__grid">
           <label class="link-field">
-            <span>患者ID</span>
-            <input id="patientIdInput" type="text" inputmode="numeric" maxlength="12" placeholder="例: 12345" />
+            <span>患者ID（5桁）</span>
+            <input id="patientIdInput" type="text" inputmode="numeric" maxlength="5" placeholder="例: 00100" />
           </label>
           <label class="link-field link-field--readonly">
             <span>来院トークン</span>
@@ -61,6 +61,6 @@
       </section>
     </main>
 
-    <script src="./src/visit-link.js?v=20260503-3"></script>
+    <script src="./src/visit-link.js?v=20260503-4"></script>
   </body>
 </html>

@@ -1,1 +1,61 @@
+1. 受付用QR作成
+http://192.168.0.27:8010/visit-link.html
+
+2. 医師用履歴URL作成
+http://192.168.0.27:8020/history-link.html
+---
+
+今のQRはこれになっています。
+
+http://127.0.0.1:8002/index.html?patient_id=66666&visit_token=TEST
+127.0.0.1 は「その端末自身」という意味なので、iPhoneで読むと iPhone自身 を見に行きます。Macには届きません。
+
+いま、iPhoneから届く形でサーバーを起動しました。
+
+Macの自宅Wi-Fi内IP:
+
+192.168.0.27
+使うURL:
+
+http://192.168.0.27:8010/visit-link.html
+MacでもiPhoneでも、まずこれを開いてください。QR作成ページの「詳細設定」内の問診アプリURLは、次にしてください。
+
+http://192.168.0.27:8010/index.html
+その状態でQRを作り直すと、作成URLはこうなります。
+
+http://192.168.0.27:8010/index.html?patient_id=66666&visit_token=TEST
+これなら、同じ自宅Wi-Fi上のiPhoneから開けるはずです。
+
+---
+
 https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec
+
+Web URL =
+index.html?patient_id=12345&visit_token=A7K2&submit_url=WEB_APP_URL
+
+ところが、これは開けない。
+index.html?patient_id=12345&visit_token=A7K2&submit_url=https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec
+
+---
+
+chatGPTの回答は、次。
+
+---
+
+状況はかなりクリアです 👍
+結論としては「HTMLアプリ自体はローカルサーバー上で正常に動いている」という意味です。
+
+今回起きていることを整理するとこうです。
+
+まず index.html?... だけでは開けなかった理由ですが、これは単なるファイル名＋クエリであって、「どこにあるindex.htmlか」がブラウザに伝わっていなかったためです。ブラウザはローカルファイルを直接クエリ付きで開くのが苦手なので、HTTPサーバー経由で提供する必要があります。
+
+そこで Codex が用意したのが
+http://127.0.0.1:8002/... というURLです。
+
+ここで重要なのは3点です。
+
+ひとつ目は 127.0.0.1 ですが、これは「このMac自身」を指す特別なIPアドレスです。localhost と完全に同義です。つまり「自分のPCの中で動いているサーバーにアクセスしている」状態です。
+
+ふたつ目は :8002 で、これはポート番号です。Codexがローカルサーバーを8002番ポートで起動しているため、その入口にアクセスしています。
+
+三つ目は、「ローカルサーバー経由でHTMLを配信している」という点です。これによりJavaScriptが正常に動き、URLSearchParams や localStorage、fetch通信などが期待通りに機能します。

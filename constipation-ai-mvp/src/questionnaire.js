@@ -283,12 +283,12 @@
       .replace(/[^A-Za-z0-9_-]/g, "")
       .slice(0, 40);
 
-    if (patientId) meta.patient_id = patientId;
+    if (patientId.length === 5) meta.patient_id = patientId;
     if (visitToken) meta.visit_token = visitToken;
     if (submittedAt) meta.submitted_at = submittedAt;
     if (visitId) {
       meta.visit_id = visitId;
-    } else if (patientId && visitToken && submittedAt) {
+    } else if (patientId.length === 5 && visitToken && submittedAt) {
       meta.visit_id = `${submittedAt.slice(0, 10).replaceAll("-", "")}-${patientId}-${visitToken}`;
     }
     return meta;

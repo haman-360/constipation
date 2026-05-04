@@ -485,14 +485,14 @@ async function submitVisitToAppsScript(sheetsPayload) {
     const result = await postVisitWithReadableResponse_(sheetsPayload);
     statusText.textContent = `院内保存が完了しました。画面を閉じても大丈夫です。来院ID: ${result.visit_id || sheetsPayload.visit_id || "未設定"}`;
     statusText.className = "submit-status__text submit-status__text--success";
-    if (statusHelp) statusHelp.textContent = "必要な場合は、下の患者用メモをコピーしてご自身用に保存できます。";
+    if (statusHelp) statusHelp.textContent = "必要な場合は、患者用メモをコピーしてご自身用に保存できます。";
     setSubmitStatusPanelState(statusPanel, "success");
   } catch (error) {
     try {
       postVisitWithHiddenForm_(sheetsPayload);
       statusText.textContent = "院内保存リクエストを送信しました。画面はまだ閉じず、受付または医師に確認してください。";
       statusText.className = "submit-status__text submit-status__text--success";
-      if (statusHelp) statusHelp.textContent = "保存結果は院内で確認します。必要な場合は、下の患者用メモをコピーできます。";
+      if (statusHelp) statusHelp.textContent = "保存結果は院内で確認します。必要な場合は、患者用メモをコピーできます。";
       setSubmitStatusPanelState(statusPanel, "success");
     } catch (fallbackError) {
       statusText.textContent = `院内保存に失敗しました。回答コードまたはJSONで確認できます。詳細: ${fallbackError.message || error.message}`;

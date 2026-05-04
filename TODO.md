@@ -106,6 +106,7 @@
 - [x] iPhoneのQR読み取りからSheets保存成功確認
 - [x] Macの患者ID入りURLからSheets保存成功確認
 - [x] 患者IDなしURLでは保存しない表示へ調整
+- [x] 患者向け最終画面の院内保存中・保存完了表示を下部固定化
 - [x] URL/QR作成ページの問診アプリURL欄を詳細設定化または非表示化
 - [x] 問診HTMLの公開方法を決める（院内端末のみ / GitHub Pages等 / Apps Script HTML化）
 - [x] Web App公開範囲の院内運用検討

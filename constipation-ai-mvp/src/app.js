@@ -215,6 +215,7 @@ function renderIntro() {
       <p>診察の前に、最近のうんちの様子を確認します。<br>
       わかる範囲で、近いものを選んでください。<br>
       薬の量をこの画面で決めることはありません。</p>
+      <p class="intro-save-note">最後に院内保存の完了表示が出るまで、この画面を閉じずにお待ちください。入力内容は最後にメモとしてコピーできます。</p>
       <button id="startButton" class="button" type="button">はじめる</button>
     </div>
   `;
@@ -399,13 +400,14 @@ function renderSubmitted() {
   setDoctorPanelVisible(isStaffMode);
   updateDashboardMode();
   els.screen.innerHTML = `
-    <div class="finish">
+    <div class="finish finish--submitted">
       <h1>送信内容を作成しました</h1>
       <p>入力内容は診察前確認のために使います。薬の量や治療方針は診察で医師が確認します。</p>
       ${isStaffMode ? `<p>医療者確認用のダッシュボードを表示しています。院内システム連携用のJSONは必要時に開けます。</p>` : ""}
-      <section class="submit-status" aria-live="polite">
+      <section id="submitStatusPanel" class="submit-status submit-status--floating submit-status--pending" aria-live="assertive">
         <h2>院内保存</h2>
         <p id="submitStatusText">${initialSubmitMessage}</p>
+        <p id="submitStatusHelp" class="submit-status__help">${canAutoSave ? "保存が完了するまで、この画面を閉じずにお待ちください。" : "必要な場合は、この画面を受付または医師に見せてください。"}</p>
         ${canAutoSave ? `<button id="retrySubmitButton" class="button button--secondary button--small" type="button" hidden>再送信</button>` : ""}
       </section>
       <section class="patient-memo">
@@ -460,34 +462,53 @@ function wireSubmitStatus(sheetsPayload) {
 }
 
 async function submitVisitToAppsScript(sheetsPayload) {
+  const statusPanel = document.getElementById("submitStatusPanel");
   const statusText = document.getElementById("submitStatusText");
+  const statusHelp = document.getElementById("submitStatusHelp");
   const retryButton = document.getElementById("retrySubmitButton");
   if (!statusText || !submitUrl) return;
   if (!sheetsPayload.patient_id || !sheetsPayload.visit_token) {
     statusText.textContent = "患者IDまたは来院トークンがURLにないため、院内保存は行いません。URL/QR作成ページから患者ID入りURLで開いてください。";
     statusText.className = "submit-status__text submit-status__text--error";
+    if (statusHelp) statusHelp.textContent = "必要な場合は、この画面を受付または医師に見せてください。";
+    setSubmitStatusPanelState(statusPanel, "error");
     return;
   }
 
-  statusText.textContent = "院内保存へ送信しています。";
+  statusText.textContent = "院内保存中です。このままお待ちください。";
   statusText.className = "submit-status__text submit-status__text--pending";
+  if (statusHelp) statusHelp.textContent = "保存が完了するまで、この画面を閉じないでください。";
+  setSubmitStatusPanelState(statusPanel, "pending");
   if (retryButton) retryButton.hidden = true;
 
   try {
     const result = await postVisitWithReadableResponse_(sheetsPayload);
-    statusText.textContent = `院内保存が完了しました。来院ID: ${result.visit_id || sheetsPayload.visit_id || "未設定"}`;
+    statusText.textContent = `院内保存が完了しました。画面を閉じても大丈夫です。来院ID: ${result.visit_id || sheetsPayload.visit_id || "未設定"}`;
     statusText.className = "submit-status__text submit-status__text--success";
+    if (statusHelp) statusHelp.textContent = "必要な場合は、下の患者用メモをコピーしてご自身用に保存できます。";
+    setSubmitStatusPanelState(statusPanel, "success");
   } catch (error) {
     try {
       postVisitWithHiddenForm_(sheetsPayload);
-      statusText.textContent = "院内保存リクエストを送信しました。保存結果はGoogle SheetsのvisitsとApps Scriptの実行ログで確認してください。";
+      statusText.textContent = "院内保存リクエストを送信しました。画面はまだ閉じず、受付または医師に確認してください。";
       statusText.className = "submit-status__text submit-status__text--success";
+      if (statusHelp) statusHelp.textContent = "保存結果は院内で確認します。必要な場合は、下の患者用メモをコピーできます。";
+      setSubmitStatusPanelState(statusPanel, "success");
     } catch (fallbackError) {
       statusText.textContent = `院内保存に失敗しました。回答コードまたはJSONで確認できます。詳細: ${fallbackError.message || error.message}`;
       statusText.className = "submit-status__text submit-status__text--error";
+      if (statusHelp) statusHelp.textContent = "この画面を閉じず、受付または医師に見せてください。";
+      setSubmitStatusPanelState(statusPanel, "error");
       if (retryButton) retryButton.hidden = false;
     }
   }
+}
+
+function setSubmitStatusPanelState(panel, stateName) {
+  if (!panel) return;
+  panel.classList.toggle("submit-status--pending", stateName === "pending");
+  panel.classList.toggle("submit-status--success", stateName === "success");
+  panel.classList.toggle("submit-status--error", stateName === "error");
 }
 
 async function postVisitWithReadableResponse_(sheetsPayload) {

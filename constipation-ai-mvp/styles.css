@@ -136,6 +136,16 @@ h3 {
   line-height: 1.7;
 }
 
+.intro-save-note {
+  margin: 20px 0 24px;
+  padding: 14px 16px;
+  border: 1px solid #8db9c4;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-strong) !important;
+  font-weight: 700;
+}
+
 .progress {
   padding: 20px 24px 0;
 }
@@ -370,6 +380,36 @@ h3 {
   background: #fbfdfe;
 }
 
+.finish--submitted {
+  padding-bottom: 180px;
+}
+
+.submit-status--floating {
+  position: fixed;
+  right: max(16px, calc((100vw - 640px) / 2 + 16px));
+  bottom: 16px;
+  left: max(16px, calc((100vw - 640px) / 2 + 16px));
+  z-index: 20;
+  margin: 0;
+  border-width: 2px;
+  box-shadow: 0 14px 32px rgba(32, 36, 42, 0.18);
+}
+
+.submit-status--pending {
+  border-color: #d6a740;
+  background: #fff7df;
+}
+
+.submit-status--success {
+  border-color: #69a87d;
+  background: #eaf7ee;
+}
+
+.submit-status--error {
+  border-color: #d8a1a1;
+  background: #fdecec;
+}
+
 .submit-status h2 {
   margin-bottom: 8px;
 }
@@ -378,8 +418,13 @@ h3 {
   margin-bottom: 12px;
 }
 
+.submit-status__help {
+  font-size: 0.92rem;
+}
+
 .submit-status__text--pending {
-  color: var(--muted);
+  color: #7a4d00;
+  font-weight: 800;
 }
 
 .submit-status__text--success {
@@ -662,6 +707,16 @@ pre {
     padding: 24px;
   }
 
+  .finish--submitted {
+    padding-bottom: 190px;
+  }
+
+  .submit-status--floating {
+    right: 18px;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    left: 18px;
+  }
+
   h1 {
     font-size: 1.72rem;
   }
@@ -740,6 +795,15 @@ pre {
   .question,
   .finish {
     padding: 20px;
+  }
+
+  .finish--submitted {
+    padding-bottom: 210px;
+  }
+
+  .submit-status--floating {
+    right: 12px;
+    left: 12px;
   }
 
   h1 {

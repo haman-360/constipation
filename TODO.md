@@ -85,6 +85,13 @@
 
 ## 次に検討
 
+### 次回優先順
+
+1. GitHub Pages版の設定を確定
+2. 医師入力のUX改善
+3. テスト運用チェックリストの最終化
+4. 医療者レビュー用資料の更新（完了）
+
 - [x] 医師側履歴確認URLの動作テスト
 - [x] `chatGPTContext` 出力の実データ確認
 - [x] 医師側履歴を読みやすく表示するHTML出力
@@ -111,10 +118,17 @@
 - [x] 問診HTMLの公開方法を決める（院内端末のみ / GitHub Pages等 / Apps Script HTML化）
 - [x] Web App公開範囲の院内運用検討
 - [x] GitHub Pages固定URL公開テスト手順の作成
-- [ ] GitHub Pagesで問診HTMLを固定URL公開するテスト
-- [ ] GitHub Pages公開URLで受付QR作成、iPhone問診、Sheets保存をテスト
+- [x] GitHub Pagesで問診HTMLを固定URL公開するテスト
+- [x] GitHub Pages公開URLで受付QR作成、iPhone問診、Sheets保存をテスト
 - [x] GitHub Pages版history-link.htmlのWeb App URL既定値設定
 - [ ] GitHub Pages運用時のWeb App URL露出と公開範囲を再確認
+- [ ] GitHub Pages版の最新修正をGitHubへpush
+- [x] 固定URL版history-link.htmlでWeb App URL既定値を最終確認
+- [x] 医師入力の両方保存中表示を改善
+- [x] 医師入力の二重クリック防止を強化
+- [x] 医師入力の保存完了後に入力欄をクリア
+- [x] テスト患者運用チェックリストをGitHub Pages運用前提で最終化
+- [x] 現在の完成形に合わせて医療者レビュー用資料を更新
 - [ ] 追加の医療者レビュー後修正
 
 

@@ -244,17 +244,21 @@ function saveDoctorEntries_(params) {
 
 function savePrescriptionFromDoctorForm(formObject) {
   savePrescription_(formObject || {});
-  return { ok: true, message: "処方履歴を保存しました。" };
+  return { ok: true, message: "処方履歴を保存しました。", saved_sections: ["prescription"] };
 }
 
 function saveToiletTrainingFromDoctorForm(formObject) {
   saveToiletTraining_(formObject || {});
-  return { ok: true, message: "トイレトレーニング履歴を保存しました。" };
+  return { ok: true, message: "トイレトレーニング履歴を保存しました。", saved_sections: ["toiletTraining"] };
 }
 
 function saveDoctorEntriesFromDoctorForm(formObject) {
-  const saved = saveDoctorEntries_(formObject || {});
-  return { ok: true, message: `${saved.join("、")}を保存しました。` };
+  const params = formObject || {};
+  const savedSections = [];
+  if (hasPrescriptionInput_(params)) savedSections.push("prescription");
+  if (hasToiletTrainingInput_(params)) savedSections.push("toiletTraining");
+  const saved = saveDoctorEntries_(params);
+  return { ok: true, message: `${saved.join("、")}を保存しました。`, saved_sections: savedSections };
 }
 
 function hasPrescriptionInput_(params) {
@@ -569,6 +573,7 @@ function generateDoctorEntryHtml(params) {
       .panel:first-of-type { margin-top: 0; }
       .meta { color: #5d6673; }
       .notice { padding: 12px 14px; border: 1px solid #8db9c4; border-radius: 8px; background: #e2f3f6; color: #07576b; font-weight: 800; }
+      .notice.saving { border-color: #d6a740; background: #fff7df; color: #7a4d00; }
       .notice.error { border-color: #d8a1a1; background: #fdecec; color: #8a2d2d; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
       label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
@@ -578,6 +583,7 @@ function generateDoctorEntryHtml(params) {
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
       button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
       button.secondary { border: 1px solid #d9e0e8; background: #fff; color: #20242a; }
+      button:disabled { cursor: wait; opacity: .62; }
       a { color: #07576b; font-weight: 800; }
       @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
     </style>
@@ -672,6 +678,15 @@ function generateDoctorEntryHtml(params) {
         message.textContent = text;
         message.hidden = false;
         message.classList.toggle("error", Boolean(isError));
+        message.classList.toggle("saving", false);
+        message.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function setSavingMessage(text) {
+        message.textContent = text;
+        message.hidden = false;
+        message.classList.remove("error");
+        message.classList.add("saving");
         message.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
 
@@ -686,19 +701,55 @@ function generateDoctorEntryHtml(params) {
       function setBusy(isBusy) {
         buttons.forEach((button) => {
           button.disabled = isBusy;
+          if (isBusy) {
+            button.dataset.originalText = button.dataset.originalText || button.textContent;
+            button.textContent = "保存中...";
+          } else if (button.dataset.originalText) {
+            button.textContent = button.dataset.originalText;
+          }
         });
+      }
+
+      function setCurrentDateTime(inputName) {
+        const input = form.elements[inputName];
+        if (!input) return;
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const local = new Date(now.getTime() - offset * 60000);
+        input.value = local.toISOString().slice(0, 16);
+      }
+
+      function clearPrescriptionFields() {
+        ["medicine_name", "dose", "instruction", "doctor_note"].forEach((name) => {
+          if (form.elements[name]) form.elements[name].value = "";
+        });
+        setCurrentDateTime("prescription_date");
+      }
+
+      function clearToiletTrainingFields() {
+        ["training_status", "diaper_status", "toilet_refusal", "note"].forEach((name) => {
+          if (form.elements[name]) form.elements[name].value = "";
+        });
+        setCurrentDateTime("training_date");
+      }
+
+      function clearSavedSections(savedSections) {
+        if (savedSections.includes("prescription")) clearPrescriptionFields();
+        if (savedSections.includes("toiletTraining")) clearToiletTrainingFields();
       }
 
       buttons.forEach((button) => {
         button.addEventListener("click", () => {
           const handlerName = handlers[button.dataset.saveAction];
           if (!handlerName) return;
+          if (button.disabled) return;
           setBusy(true);
-          setMessage("保存しています...", false);
+          setSavingMessage("保存中です。このままお待ちください。");
           google.script.run
             .withSuccessHandler((result) => {
               setBusy(false);
-              setMessage((result && result.message) || "保存しました。", false);
+              clearSavedSections((result && result.saved_sections) || []);
+              setMessage(((result && result.message) || "保存しました。") + " 入力欄をクリアしました。", false);
             })
             .withFailureHandler((error) => {
               setBusy(false);

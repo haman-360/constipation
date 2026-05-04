@@ -1,73 +1,93 @@
-# 実患者データ投入前のテスト患者運用手順
+# 実患者前テスト患者チェックリスト
 
 ## 目的
 
-実患者データを入れる前に、受付でのQR作成、患者側入力、Google Sheets保存、医師側確認の流れをテスト患者IDで確認する。
+実患者データを入れる前に、GitHub Pages固定URLから、受付QR作成、患者入力、Google Sheets保存、医師側履歴確認、医師入力までをテスト患者IDで確認する。
+
+## 使うURL
+
+- 受付用QR作成: `https://haman-360.github.io/constipation/constipation-ai-mvp/visit-link.html`
+- 患者向け問診: `https://haman-360.github.io/constipation/constipation-ai-mvp/index.html`
+- 医師用履歴URL作成: `https://haman-360.github.io/constipation/constipation-ai-mvp/history-link.html`
+- Google Apps Script Web App URL: デプロイ済みの `/exec` URL
 
 ## 使うテスト情報
 
-- 患者ID: `99999` など、実患者と重ならない5桁番号
-- 来院トークン: QR作成ページで自動生成
-- 問診URL: 院内で使う公開方法に合わせた `index.html` のURL
-- Google Apps Script Web App URL: 現在デプロイ済みの `/exec` URL
+- 患者ID: 実患者と重ならない5桁ID。例: `99999`
+- 来院トークン: 受付用QR作成ページで自動生成される4文字
+- 実患者を直接特定する氏名、電話番号、住所などは入力しない
 
 ## 事前確認
 
-1. Apps Script の `setupSheets()` が実行済みである。
-2. Google Sheets に `visits` シートがある。
-3. `index.html` から保存する Web App URL が設定済みである。
-4. ローカル確認では、患者端末とMacが同じWi-Fiに接続されている。
-5. iPhoneなど別端末で読むQRには、`127.0.0.1` ではなくMacのLAN内IPアドレスを使う。
+- [ ] GitHub Pagesの3 URLが開く
+- [ ] Apps Scriptの `setupSheets()` が実行済み
+- [ ] Google Sheetsに `patients` / `visits` / `prescriptions` / `toilet_training` / `diary_weekly` がある
+- [ ] Apps Script Web Appの `/exec` URLが現在の保存先として使える
+- [ ] `history-link.html` のWeb App URL欄は通常変更不要。URLを再デプロイで作り直した場合だけ変更する
 
-## 受付で確認すること
+## 受付QR作成
 
-1. `visit-link.html` を開く。
-2. 患者IDに5桁のテストIDを入力する。先頭ゼロがある場合は省略しない。
-3. 来院トークンが表示されていることを確認する。
-4. QRが表示されることを確認する。
-5. 必要時のみ `詳細設定` を開き、問診アプリURLを確認する。
-6. QRをスマートフォンで読み取り、問診画面が開くことを確認する。
+- [ ] `visit-link.html` を開く
+- [ ] 患者IDに5桁のテストIDを入力する
+- [ ] 来院トークンが表示されている
+- [ ] 詳細設定の問診アプリURLがGitHub Pagesの `index.html` になっている
+- [ ] QRが表示される
+- [ ] iPhoneでQRを読み取り、問診画面が開く
 
-## 患者側入力で確認すること
+## 患者入力
 
-1. 問診を最後まで入力する。
-2. 直近日誌は、空欄パターンと入力ありパターンをそれぞれ1回ずつ試す。
-3. 最終画面で、薬の増減や診断を指示する文言が出ていないことを確認する。
-4. 院内保存の結果が成功表示になることを確認する。
+- [ ] 問診を最後まで入力できる
+- [ ] 直近日誌なしのパターンを1回確認する
+- [ ] 直近日誌ありのパターンを1回確認する
+- [ ] 最終画面下部に `院内保存中です。このままお待ちください。` が出る
+- [ ] 保存完了後に `院内保存が完了しました。画面を閉じても大丈夫です。` が出る
+- [ ] 患者用メモをコピーできる
+- [ ] 患者向け画面に、薬の増減や診断を指示する文言が出ていない
 
-## Google Sheetsで確認すること
+## Google Sheets確認
 
-1. `visits` シートに新しい行が追加されている。
-2. `patient_id` がテストIDになっている。
-3. `visit_token` がQR作成ページの表示と一致している。
-4. `urgency_level` が `watch` または `stable` になっている。
-5. `questionnaire_json` と `summary_text` が保存されている。
-6. JSON列が通常確認の邪魔にならない表示設定になっている。
-7. `patients` シートに同じテストIDが未登録だった場合、1行追加されている。
-8. 直近日誌を入力した場合、`diary_weekly` シートに1行追加されている。
-9. `prescriptions` と `toilet_training` は患者問診から自動入力されていない。
+- [ ] `visits` に新しい行が追加されている
+- [ ] `patient_id` がテストIDと一致する
+- [ ] `visit_token` がQR作成ページの表示と一致する
+- [ ] `urgency_level` が `watch` または `stable`
+- [ ] `questionnaire_json` と `summary_text` が保存されている
+- [ ] 同じテストIDが未登録だった場合、`patients` に1行追加されている
+- [ ] 直近日誌ありの場合、`diary_weekly` に1行追加されている
+- [ ] 患者問診から `prescriptions` / `toilet_training` が自動追加されていない
 
-## 医師側確認で見ること
+## 医師側履歴確認
 
-1. 医師向けサマリーで、直近の排便状況が一目で確認できる。
-2. 安全・追加確認項目が、診断ではなく「診察で確認する内容」として表示されている。
-3. 便秘薬の状況が、処方量変更の指示ではなく確認材料として整理されている。
-4. `chatGPTContext` を使う場合は、過去経過の変化点と不足情報の整理に限定されている。
-5. 必要時のみ、医師入力画面から処方履歴とトイレトレーニング履歴を追記できる。
-6. 追記後、便秘履歴画面に処方履歴とトイレトレーニング履歴が表示される。
-7. 医師入力画面で保存後にブラウザ更新しても、同じ行が重複保存されない。
+- [ ] `history-link.html` を開く
+- [ ] 同じテスト患者IDを入力する
+- [ ] 医師入力URL、医師用履歴表示URL、患者履歴JSON URL、ChatGPT用URLが生成される
+- [ ] `医師用履歴表示を開く` で便秘履歴が表示される
+- [ ] 画面上部の `診察前の確認` に直近問診、処方、トイレトレーニング、週次日誌が表示される
+- [ ] 処方履歴、トイレトレーニング履歴、週次日誌が日本語ラベルで読める
+- [ ] `ChatGPT貼り付け用テキストをページ内で表示` とコピーが動く
+
+## 医師入力確認
+
+- [ ] `医師入力を開く` で医師入力画面が開く
+- [ ] 処方履歴だけ保存できる
+- [ ] トイレトレーニング履歴だけ保存できる
+- [ ] 両方とも保存できる
+- [ ] 保存中はボタンが押せない状態になり、二重クリックしにくい
+- [ ] 保存完了後、入力欄がクリアされる
+- [ ] 保存後、Sheetsの `prescriptions` / `toilet_training` に日時つきで反映される
+- [ ] 便秘履歴画面に戻ると、保存した処方・トイレトレーニングが表示される
 
 ## 合格条件
 
-- QR作成から問診送信まで、スタッフが迷わず進められる。
-- 患者IDと来院トークンがSheets上で一致する。
-- 患者向け画面が自己判断を促さない。
-- 医師向け画面が診察前確認に必要な情報を過不足なく出す。
-- 実患者を直接特定する情報をテスト中に入力していない。
+- [ ] 受付QR作成からiPhone問診送信まで迷わず進められる
+- [ ] Google Sheetsに患者ID、来院トークン、問診、日誌が正しく保存される
+- [ ] 医師側履歴で、診察前に必要な直近情報が一目で確認できる
+- [ ] 医師入力で処方履歴とトイレトレーニング履歴を追記できる
+- [ ] 実患者を直接特定する情報をテスト中に入力していない
 
-## 失敗時の切り分け
+## うまくいかない場合
 
-- QRを読んでも開けない: 問診アプリURLが患者端末から到達できるURLか確認する。
-- 保存に失敗する: Web App URL、Apps Scriptの公開範囲、Spreadsheet IDを確認する。
-- `visits` に追加されない: Apps Scriptの実行ログとWeb AppのデプロイURLが `/exec` か確認する。
-- 患者IDなしで開いた: Sheets保存対象外として扱われるため、QR作成ページから再発行する。
+- QRで問診が開かない: `visit-link.html` の詳細設定で問診アプリURLがGitHub Pagesの `index.html` になっているか確認する
+- 院内保存が失敗する: Apps Script Web App URL、公開範囲、Spreadsheet IDを確認する
+- `visits` に追加されない: Apps Scriptの実行ログとWeb AppのデプロイURLが `/exec` か確認する
+- 医師用履歴URLが出ない: `history-link.html` のWeb App URL欄に実際の `/exec` URLが入っているか確認する
+- 医師入力が保存されない: Apps Scriptを最新の `apps-script/Code.gs` に貼り替え、Web Appを再デプロイしたか確認する

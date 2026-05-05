@@ -170,15 +170,17 @@ function submitVisit(payload) {
   validateSubmitVisitPayload_(payload);
   const patientId = requirePatientId_(payload.patient_id);
   const sheet = getOrCreateSheet_(SHEET_NAMES.visits, VISITS_HEADERS);
-  const savedAt = new Date().toISOString();
+  const savedAt = dateTimeInScriptTimezone_(new Date());
+  const submittedAt = dateTimeInScriptTimezone_(payload.submitted_at || savedAt);
+  const visitId = visitIdInScriptTimezone_(payload.visit_id, submittedAt, patientId, payload.visit_token);
   const outputs = payload.outputs || {};
 
   const patientSaved = upsertPatient_(patientId, savedAt, payload.age_years, payload.age_months);
   sheet.appendRow([
-    payload.visit_id,
+    visitId,
     patientId,
     payload.visit_token || "",
-    payload.submitted_at || "",
+    submittedAt,
     savedAt,
     outputs.urgency_level || "",
     outputs.urgency_label || "",
@@ -195,7 +197,7 @@ function submitVisit(payload) {
 
   return {
     ok: true,
-    visit_id: payload.visit_id,
+    visit_id: visitId,
     patient_id: patientId,
     saved_at: savedAt,
     patient_saved: patientSaved,
@@ -406,7 +408,7 @@ function dateOnlyInScriptTimezone_(value) {
 
 function dateTimeInScriptTimezone_(value) {
   const text = String(value || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(text)) {
     const compact = text.slice(0, 19).replace("T", " ");
     return compact.length === 16 ? `${compact}:00` : compact;
   }
@@ -418,6 +420,18 @@ function dateTimeInScriptTimezone_(value) {
   } catch (error) {
     return date.toISOString().slice(0, 19).replace("T", " ");
   }
+}
+
+function visitIdInScriptTimezone_(visitId, submittedAt, patientId, visitToken) {
+  const token = String(visitToken || "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .slice(0, 12)
+    .toUpperCase();
+  const datePart = String(submittedAt || "").slice(0, 10).replace(/\D/g, "");
+  if (datePart && patientId && token) return `${datePart}-${patientId}-${token}`;
+  return String(visitId || "")
+    .replace(/[^A-Za-z0-9_-]/g, "")
+    .slice(0, 40);
 }
 
 function dateTimeInputValue_(value) {

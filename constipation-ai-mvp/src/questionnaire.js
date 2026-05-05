@@ -169,7 +169,7 @@
     "diary_note",
   ];
 
-  const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at"];
+  const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at", "age_years", "age_months"];
 
   const QUESTIONNAIRE_FIELD_IDS = [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER];
 
@@ -282,16 +282,27 @@
     const visitId = String(input.visit_id || "")
       .replace(/[^A-Za-z0-9_-]/g, "")
       .slice(0, 40);
+    const ageYears = normalizeAgeNumber_(input.age_years, 0, 18);
+    const ageMonths = normalizeAgeNumber_(input.age_months, 0, 11);
 
     if (patientId.length === 5) meta.patient_id = patientId;
     if (visitToken) meta.visit_token = visitToken;
     if (submittedAt) meta.submitted_at = submittedAt;
+    if (ageYears !== undefined) meta.age_years = ageYears;
+    if (ageMonths !== undefined) meta.age_months = ageMonths;
     if (visitId) {
       meta.visit_id = visitId;
     } else if (patientId.length === 5 && visitToken && submittedAt) {
       meta.visit_id = `${submittedAt.slice(0, 10).replaceAll("-", "")}-${patientId}-${visitToken}`;
     }
     return meta;
+  }
+
+  function normalizeAgeNumber_(value, min, max) {
+    if (value === undefined || value === null || value === "") return undefined;
+    const number = Number.parseInt(String(value), 10);
+    if (!Number.isFinite(number) || number < min || number > max) return undefined;
+    return number;
   }
 
   function mergeVisitMeta(base, meta) {
@@ -331,6 +342,15 @@
     if (data[fieldId] === undefined) return "未確認";
     if (Array.isArray(data[fieldId])) return data[fieldId].length ? data[fieldId].join("、") : "なし";
     return data[fieldId] || "未確認";
+  }
+
+  function ageText(data) {
+    const hasYears = data.age_years !== undefined && data.age_years !== "";
+    const hasMonths = data.age_months !== undefined && data.age_months !== "";
+    if (!hasYears && !hasMonths) return "未確認";
+    const years = hasYears ? `${data.age_years}歳` : "";
+    const months = hasMonths ? `${data.age_months}か月` : "";
+    return `${years}${months}` || "未確認";
   }
 
   function medicineStatus(data) {
@@ -627,6 +647,8 @@
     const followUps = aiFollowUpItems(data).map((item) => `- ${item}`).join("\n");
     return `【診察前 便秘ミニサマリー】
 
+年齢: ${ageText(data)}
+
 最終排便: ${displayValue(data, "q1_last_bowel_movement")}
 最近の排便頻度: ${displayValue(data, "q2_bowel_frequency")}
 うんちの硬さ: ${displayValue(data, "q3_stool_consistency")}
@@ -670,6 +692,7 @@ AIが判断していないこと:
 
 確認区分: ${review.urgency.label}
 概要: ${review.headline}
+年齢: ${ageText(data)}
 
 診察で見るポイント:
 ${review.checkItems.map((item) => `- ${item}`).join("\n")}
@@ -725,6 +748,8 @@ ${diarySection}
       visit_id: data.visit_id || "",
       visit_token: data.visit_token || "",
       submitted_at: data.submitted_at || "",
+      age_years: data.age_years === undefined ? "" : data.age_years,
+      age_months: data.age_months === undefined ? "" : data.age_months,
       questionnaire: pickDefined(data, QUESTIONNAIRE_FIELD_IDS),
       diary: pickDefined(data, DIARY_FIELD_IDS),
       outputs: {

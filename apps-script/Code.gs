@@ -162,7 +162,7 @@ function submitVisit(payload) {
   const savedAt = new Date().toISOString();
   const outputs = payload.outputs || {};
 
-  const patientSaved = upsertPatient_(patientId, savedAt);
+  const patientSaved = upsertPatient_(patientId, savedAt, payload.age_years, payload.age_months);
   sheet.appendRow([
     payload.visit_id,
     patientId,
@@ -269,18 +269,45 @@ function hasToiletTrainingInput_(params) {
   return ["training_status", "diaper_status", "toilet_refusal", "note"].some((key) => String(params[key] || "").trim());
 }
 
-function upsertPatient_(patientId, createdAt) {
+function upsertPatient_(patientId, createdAt, ageYears, ageMonths) {
   const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
-  const exists = rowsForPatient_(SHEET_NAMES.patients, PATIENTS_HEADERS, patientId).length > 0;
-  if (exists) return false;
+  const existingRow = findPatientRow_(sheet, patientId);
+  if (existingRow) {
+    updatePatientAgeIfPresent_(sheet, existingRow, ageYears, ageMonths);
+    return false;
+  }
   sheet.appendRow([
     patientId,
-    "",
-    "",
+    ageOrBlank_(ageYears, 18),
+    ageOrBlank_(ageMonths, 11),
     createdAt,
     "",
   ]);
   return true;
+}
+
+function findPatientRow_(sheet, patientId) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const values = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+  for (let index = 0; index < values.length; index += 1) {
+    if (normalizePatientId_(values[index][0]) === patientId) return index + 2;
+  }
+  return 0;
+}
+
+function updatePatientAgeIfPresent_(sheet, row, ageYears, ageMonths) {
+  const years = ageOrBlank_(ageYears, 18);
+  const months = ageOrBlank_(ageMonths, 11);
+  if (years !== "") sheet.getRange(row, 2).setValue(years);
+  if (months !== "") sheet.getRange(row, 3).setValue(months);
+}
+
+function ageOrBlank_(value, max) {
+  if (value === "" || value === null || value === undefined) return "";
+  const number = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(number) || number < 0 || number > max) return "";
+  return number;
 }
 
 function appendDiaryWeeklyIfPresent_(payload, patientId, savedAt) {
@@ -372,6 +399,7 @@ function getPatientHistory(params) {
   return {
     ok: true,
     patient_id: patientId,
+    patient: getPatient_(patientId),
     visits: latestByDate_(rowsForPatient_(SHEET_NAMES.visits, VISITS_HEADERS, patientId).map(parseVisitRow_), limit, "submitted_at"),
     prescriptions: latestByDate_(rowsForPatient_(SHEET_NAMES.prescriptions, PRESCRIPTIONS_HEADERS, patientId), limit, "date"),
     toilet_training: latestByDate_(rowsForPatient_(SHEET_NAMES.toiletTraining, TOILET_TRAINING_HEADERS, patientId), limit, "date"),
@@ -389,6 +417,7 @@ function generateChatGPTContext(params) {
     "過去経過から、医師が確認すべき変化点、追加で聞くべきこと、注意して見るべき矛盾点だけを整理してください。",
     "",
     `患者ID: ${history.patient_id}`,
+    `年齢: ${patientAgeText_(history.patient)}`,
     `対象履歴: 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件`,
     "",
     "【受診・問診履歴】",
@@ -462,7 +491,7 @@ function generateDoctorHistoryHtml(params) {
   <body>
     <main>
       <h1>便秘履歴</h1>
-      <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
+      <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(patientAgeText_(history.patient))} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
       <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(contextUrl)}" target="_blank" rel="noreferrer">ChatGPT貼り付け用テキストを開く</a></p>
       <details>
         <summary>ChatGPT貼り付け用テキストをページ内で表示</summary>
@@ -513,6 +542,20 @@ function generateDoctorHistoryHtml(params) {
     </script>
   </body>
 </html>`;
+}
+
+function getPatient_(patientId) {
+  return rowsForPatient_(SHEET_NAMES.patients, PATIENTS_HEADERS, patientId)[0] || {};
+}
+
+function patientAgeText_(patient) {
+  if (!patient) return "未確認";
+  const hasYears = patient.age_years !== "" && patient.age_years !== null && patient.age_years !== undefined;
+  const hasMonths = patient.age_months !== "" && patient.age_months !== null && patient.age_months !== undefined;
+  if (!hasYears && !hasMonths) return "未確認";
+  const years = hasYears ? `${patient.age_years}歳` : "";
+  const months = hasMonths ? `${patient.age_months}か月` : "";
+  return `${years}${months}` || "未確認";
 }
 
 function formatPreVisitItemsHtml_(history) {

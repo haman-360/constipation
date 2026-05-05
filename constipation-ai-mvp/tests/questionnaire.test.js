@@ -1210,12 +1210,16 @@ const visitMetaCases = [
       visit_id: "visit 2026/05/03 #1",
       visit_token: "xy9",
       submitted_at: "2026-05-03T11:00:00+09:00",
+      age_years: "2",
+      age_months: "6",
     },
     expected: {
       patient_id: "00987",
       visit_token: "XY9",
       submitted_at: "2026-05-03T11:00:00+09:00",
       visit_id: "visit202605031",
+      age_years: 2,
+      age_months: 6,
     },
   },
   {
@@ -1274,15 +1278,20 @@ const sheetsPayloadInput = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers({
   patient_id: "123456",
   visit_token: "a7-k2",
   submitted_at: "2026-05-03T10:15:00+09:00",
+  age_years: "3",
+  age_months: "1",
 });
 const sheetsPayload = generateSheetsVisitPayload(sheetsPayloadInput);
 assert.strictEqual(sheetsPayload.patient_id, "12345", "SHEETS-PAYLOAD: patient_id mismatch");
 assert.strictEqual(sheetsPayload.visit_token, "A7K2", "SHEETS-PAYLOAD: visit_token mismatch");
 assert.strictEqual(sheetsPayload.visit_id, "20260503-12345-A7K2", "SHEETS-PAYLOAD: visit_id mismatch");
+assert.strictEqual(sheetsPayload.age_years, 3, "SHEETS-PAYLOAD: age_years mismatch");
+assert.strictEqual(sheetsPayload.age_months, 1, "SHEETS-PAYLOAD: age_months mismatch");
 assert.strictEqual(sheetsPayload.outputs.urgency_level, "watch", "SHEETS-PAYLOAD: urgency level mismatch");
 assert.strictEqual(sheetsPayload.outputs.urgency_label, "診察で確認", "SHEETS-PAYLOAD: urgency label mismatch");
 assert(sheetsPayload.outputs.headline.includes("4日以上"), "SHEETS-PAYLOAD: headline missing");
 assert(sheetsPayload.outputs.summary_text.includes("【診察前 便秘ミニサマリー】"), "SHEETS-PAYLOAD: summary missing");
+assert(sheetsPayload.outputs.summary_text.includes("年齢: 3歳1か月"), "SHEETS-PAYLOAD: summary age missing");
 assert(sheetsPayload.outputs.facility_share_text.includes("【院内共有用 便秘問診】"), "SHEETS-PAYLOAD: facility share missing");
 assert(sheetsPayload.outputs.patient_memo_text.includes("【便秘メモ】"), "SHEETS-PAYLOAD: patient memo missing");
 assert.deepStrictEqual(Object.keys(sheetsPayload.diary).sort(), [

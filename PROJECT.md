@@ -67,6 +67,7 @@
 - PDF/印刷用ダッシュボード
 - 患者向け保存メモ
 - 患者ID・来院トークン入り問診URL/QR作成ページ
+- 医師側の患者台帳UI（生年月日、台帳メモ）
 
 ### 診察支援ダッシュボード（最新）
 
@@ -263,7 +264,8 @@ MVP → Google Sheets連携の動作確認済み段階
 - `submitVisit` 保存時に、未登録患者IDを `patients` へ自動追加し、直近日誌入力がある場合は `diary_weekly` へ自動保存する。
 - `patients.birth_date` に生年月日を入力しておくと、便秘履歴とChatGPT貼り付け用テキストでは直近受診日を基準に年齢を自動計算する。
 - 患者画面では年齢を入力させない。初診後に医師が `patients.birth_date` を1回入力し、再診時は患者IDと受診日から年齢を算出する。
-- 将来案として、初診時のみ受付または医師側で `patients.birth_date` を登録し、再診時は患者IDと受診日から年齢プロファイルを自動判定する。
+- `patientProfile` で、医師側から `patients.birth_date` と台帳メモを登録できる。
+- 初診時のみ受付または医師側で `patients.birth_date` を登録し、再診時は患者IDと受診日から年齢を自動計算する。年齢プロファイル自動判定は次段階で実装する。
 - 生年月日はGitHub PagesのURL、QRコード、患者向けメモ、ChatGPT貼り付け用テキストには直接含めない。ChatGPTには年齢表示のみを渡す。
 - QR読み込み直後の患者画面に年齢を自動表示するには、問診開始前にWeb Appへ患者台帳を照会する必要があるため、現MVPでは搭載しない。年齢は医師側履歴とChatGPT貼り付け用テキストで確認する。
 - Sheets上で患者IDが `1234` のように見えていても、履歴取得時は `01234` と同じ5桁IDとして扱う。`setupSheets()` または `formatExistingSheets()` 実行でID列を文字列形式に整える。
@@ -271,6 +273,7 @@ MVP → Google Sheets連携の動作確認済み段階
 - `visit-link.html` で、患者ID・来院トークン入りの問診URLとQRを作成可能。
 - `history-link.html` で、医師用履歴表示、患者履歴JSON、ChatGPT診察前整理テキスト、ChatGPT治療方針検討テキストの確認URLを作成可能。
 - Apps Scriptの `doctorEntry` で、医師が `prescriptions` と `toilet_training` を手入力で追記可能。
+- Apps Scriptの `patientProfile` で、医師が `patients.birth_date` と台帳メモを編集可能。
 - `doctorEntry` は処方履歴だけ、トイレトレーニング履歴だけ、両方同時保存の3操作に対応する。
 - `prescriptions.date` と `toilet_training.date` は診察前確認で時系列を追えるよう日時（`yyyy-MM-dd HH:mm:ss`）で保存する。
 - 医師入力の保存後は入力画面へ戻し、ブラウザ更新で同じPOSTが再送信されにくい運用にする。

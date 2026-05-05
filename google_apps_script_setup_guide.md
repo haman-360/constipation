@@ -104,16 +104,21 @@ http://localhost:8000/history-link.html
    - 両方を入力した場合は `両方とも保存`、片方だけの場合は個別保存ボタンを使う。
    - 処方履歴とトイレトレーニング履歴の `date` は日時（`yyyy-MM-dd HH:mm:ss`）で保存される。
    - 保存後は医師入力画面に戻る。ブラウザ更新で同じ内容が再送信されないことを確認する。
-4. `医師用履歴表示を開く` で診察前に見やすい履歴画面を確認する。
+4. `患者台帳を開く` で、生年月日と台帳メモを必要時に登録する。
+   - 生年月日は `patients.birth_date` に保存される。
+   - 生年月日は患者向けURL、QR、ChatGPT貼り付け用テキストには直接含めない。
+   - 便秘履歴とChatGPT貼り付け用テキストでは、直近受診日を基準にした年齢表示だけを使う。
+5. `医師用履歴表示を開く` で診察前に見やすい履歴画面を確認する。
    - 画面内の `ChatGPT診察前整理テキストをページ内で表示` から診察前整理モードを確認できる。
    - 画面内の `ChatGPT治療方針検討テキストをページ内で表示` から医師向け治療方針検討モードを確認できる。
-5. `患者履歴JSONを開く` で `patientHistory` の応答を確認する。
-6. `診察前整理テキストを開く` と `治療方針検討テキストを開く` で `chatGPTContext` の2モード出力を確認する。
+6. `患者履歴JSONを開く` で `patientHistory` の応答を確認する。
+7. `診察前整理テキストを開く` と `治療方針検討テキストを開く` で `chatGPTContext` の2モード出力を確認する。
 
 作成されるURL例:
 
 ```text
 https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=doctorEntry&patient_id=99999&limit=5
+https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=patientProfile&patient_id=99999&limit=5
 https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=doctorHistory&patient_id=99999&limit=5
 https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=patientHistory&patient_id=99999&limit=5
 https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=chatGPTContext&patient_id=99999&limit=5

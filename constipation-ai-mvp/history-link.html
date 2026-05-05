@@ -11,7 +11,7 @@
       <section class="link-tool panel">
         <div class="link-tool__header">
           <h1>医師用履歴URL作成</h1>
-          <p>患者IDから、医師用履歴表示、Google Sheets履歴JSON、ChatGPT貼り付け用テキストURLを作成します。</p>
+          <p>患者IDから、医師用履歴表示、患者台帳、Google Sheets履歴JSON、ChatGPT貼り付け用テキストURLを作成します。</p>
         </div>
 
         <div class="link-tool__grid">
@@ -36,6 +36,7 @@
 
         <div class="link-tool__actions">
           <button id="copyEntryButton" class="button" type="button">医師入力URLコピー</button>
+          <button id="copyProfileButton" class="button" type="button">患者台帳URLコピー</button>
           <button id="copyDoctorButton" class="button" type="button">医師用URLコピー</button>
           <button id="copyHistoryButton" class="button" type="button">履歴URLコピー</button>
           <button id="copyPreVisitContextButton" class="button button--secondary" type="button">診察前整理URLコピー</button>
@@ -46,6 +47,12 @@
           <h2>医師入力</h2>
           <pre id="entryUrlOutput"></pre>
           <p><a id="entryOpenLink" href="#" target="_blank" rel="noreferrer">医師入力を開く</a></p>
+        </section>
+
+        <section class="link-output">
+          <h2>患者台帳</h2>
+          <pre id="profileUrlOutput"></pre>
+          <p><a id="profileOpenLink" href="#" target="_blank" rel="noreferrer">患者台帳を開く</a></p>
         </section>
 
         <section class="link-output">
@@ -76,6 +83,6 @@
       </section>
     </main>
 
-    <script src="./src/history-link.js?v=20260505-1"></script>
+    <script src="./src/history-link.js?v=20260506-1"></script>
   </body>
 </html>

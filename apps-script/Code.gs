@@ -121,6 +121,9 @@ function doGet(e) {
     if (action === "doctorEntry") {
       return htmlResponse_(generateDoctorEntryHtml(e.parameter || {}));
     }
+    if (action === "patientProfile") {
+      return htmlResponse_(generatePatientProfileHtml(e.parameter || {}));
+    }
     throw new Error(`Unsupported action: ${action}`);
   } catch (error) {
     return jsonResponse_({ ok: false, error: String(error.message || error) }, 400);
@@ -142,6 +145,10 @@ function doPost(e) {
       const saved = saveDoctorEntries_(params);
       return redirectResponse_(buildSelfUrl_("doctorEntry", requirePatientId_(params.patient_id), 5, { message: saved.join("、") + "を保存しました。" }));
     }
+    if (params.action === "savePatientProfile") {
+      savePatientProfile_(params);
+      return redirectResponse_(buildSelfUrl_("patientProfile", requirePatientId_(params.patient_id), 5, { message: "患者台帳を保存しました。" }));
+    }
     const payload = parseJsonBody_(e);
     const result = submitVisit(payload);
     return jsonResponse_(result);
@@ -149,6 +156,9 @@ function doPost(e) {
     if (params.action && params.patient_id) {
       const patientId = normalizePatientId_(params.patient_id);
       if (patientId.length === 5) {
+        if (params.action === "savePatientProfile") {
+          return redirectResponse_(buildSelfUrl_("patientProfile", patientId, 5, { message: `保存できませんでした: ${String(error.message || error)}` }));
+        }
         return redirectResponse_(buildSelfUrl_("doctorEntry", patientId, 5, { message: `保存できませんでした: ${String(error.message || error)}` }));
       }
     }
@@ -260,6 +270,40 @@ function saveDoctorEntriesFromDoctorForm(formObject) {
   if (hasToiletTrainingInput_(params)) savedSections.push("toiletTraining");
   const saved = saveDoctorEntries_(params);
   return { ok: true, message: `${saved.join("、")}を保存しました。`, saved_sections: savedSections };
+}
+
+function savePatientProfile_(params) {
+  const patientId = requirePatientId_(params.patient_id);
+  const savedAt = new Date().toISOString();
+  const birthDate = normalizeBirthDate_(params.birth_date);
+  const note = String(params.patient_note || "").trim();
+  const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
+  const existingRow = findPatientRow_(sheet, patientId);
+
+  if (existingRow) {
+    sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
+    sheet.getRange(existingRow, 5).setValue(note);
+    sheet.getRange(existingRow, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
+    return { ok: true, created: false };
+  }
+
+  sheet.appendRow([
+    patientId,
+    "",
+    "",
+    savedAt,
+    note,
+    birthDate,
+  ]);
+  const row = sheet.getLastRow();
+  sheet.getRange(row, 1).setNumberFormat("@").setValue(patientId);
+  sheet.getRange(row, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
+  return { ok: true, created: true };
+}
+
+function savePatientProfileFromForm(formObject) {
+  savePatientProfile_(formObject || {});
+  return { ok: true, message: "患者台帳を保存しました。" };
 }
 
 function hasPrescriptionInput_(params) {
@@ -386,6 +430,23 @@ function dateTimeInputValue_(value) {
   }
 }
 
+function dateInputValue_(value) {
+  const date = parseDateOnly_(value);
+  if (!date) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeBirthDate_(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error("生年月日は yyyy-mm-dd 形式で入力してください。");
+  const date = parseDateOnly_(text);
+  if (!date || date.toISOString().slice(0, 10) !== text) throw new Error("生年月日の日付を確認してください。");
+  const today = parseDateOnly_(new Date());
+  if (today && date > today) throw new Error("生年月日は未来の日付にできません。");
+  return text;
+}
+
 function addDays_(dateText, days) {
   if (!dateText) return "";
   const date = new Date(`${dateText}T00:00:00Z`);
@@ -503,6 +564,7 @@ function generateDoctorHistoryHtml(params) {
   const preVisitContextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5), { mode: "preVisit" });
   const treatmentContextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5), { mode: "treatmentReview" });
   const entryUrl = buildSelfUrl_("doctorEntry", history.patient_id, normalizeLimit_(params.limit, 5));
+  const profileUrl = buildSelfUrl_("patientProfile", history.patient_id, normalizeLimit_(params.limit, 5));
   const preVisitContextText = generateChatGPTContext({ ...params, mode: "preVisit" });
   const treatmentContextText = generateChatGPTContext({ ...params, mode: "treatmentReview" });
   const preVisitItems = formatPreVisitItemsHtml_(history);
@@ -549,7 +611,7 @@ function generateDoctorHistoryHtml(params) {
     <main>
       <h1>便秘履歴</h1>
       <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(history.age_text)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
-      <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(preVisitContextUrl)}" target="_blank" rel="noreferrer">ChatGPT診察前整理を開く</a> / <a href="${escapeHtml_(treatmentContextUrl)}" target="_blank" rel="noreferrer">ChatGPT治療方針検討を開く</a></p>
+      <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(profileUrl)}">患者台帳を開く</a> / <a href="${escapeHtml_(preVisitContextUrl)}" target="_blank" rel="noreferrer">ChatGPT診察前整理を開く</a> / <a href="${escapeHtml_(treatmentContextUrl)}" target="_blank" rel="noreferrer">ChatGPT治療方針検討を開く</a></p>
       <details>
         <summary>ChatGPT診察前整理テキストをページ内で表示</summary>
         <div class="copy-row">
@@ -695,6 +757,7 @@ function generateDoctorEntryHtml(params) {
   const nowValue = dateTimeInputValue_(new Date());
   const formAction = serviceUrl_();
   const historyUrl = buildSelfUrl_("doctorHistory", patientId, normalizeLimit_(params.limit, 5));
+  const profileUrl = buildSelfUrl_("patientProfile", patientId, normalizeLimit_(params.limit, 5));
   return `
 <!doctype html>
 <html lang="ja">
@@ -732,7 +795,7 @@ function generateDoctorEntryHtml(params) {
     <main>
       <h1>医師入力</h1>
       <p class="meta">患者ID: ${escapeHtml_(patientId)}</p>
-      <p><a href="${escapeHtml_(historyUrl)}">便秘履歴へ戻る</a></p>
+      <p><a href="${escapeHtml_(historyUrl)}">便秘履歴へ戻る</a> / <a href="${escapeHtml_(profileUrl)}">患者台帳を開く</a></p>
       <p id="saveMessage" class="notice" ${params.message ? "" : "hidden"}>${params.message ? escapeHtml_(params.message) : ""}</p>
 
       <form id="doctorEntryForm" method="post" action="${escapeHtml_(formAction)}" target="_top">
@@ -896,6 +959,128 @@ function generateDoctorEntryHtml(params) {
               setMessage("保存できませんでした: " + (error && error.message ? error.message : error), true);
             })[handlerName](formObject());
         });
+      });
+    </script>
+  </body>
+</html>`;
+}
+
+function generatePatientProfileHtml(params) {
+  const patientId = requirePatientId_(params.patient_id);
+  const history = getPatientHistory({ ...params, patient_id: patientId });
+  const patient = history.patient || {};
+  const formAction = serviceUrl_();
+  const historyUrl = buildSelfUrl_("doctorHistory", patientId, normalizeLimit_(params.limit, 5));
+  const entryUrl = buildSelfUrl_("doctorEntry", patientId, normalizeLimit_(params.limit, 5));
+  const birthDateValue = dateInputValue_(patient.birth_date);
+  return `
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>患者台帳 ${escapeHtml_(patientId)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f4f7f9; color: #20242a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      main { width: min(760px, calc(100% - 32px)); margin: 28px auto; }
+      h1 { margin: 0 0 8px; font-size: 1.7rem; }
+      h2 { margin: 0 0 14px; font-size: 1.1rem; }
+      p { line-height: 1.7; }
+      .panel { margin-top: 16px; padding: 18px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fff; }
+      .meta, .help { color: #5d6673; }
+      .notice { padding: 12px 14px; border: 1px solid #8db9c4; border-radius: 8px; background: #e2f3f6; color: #07576b; font-weight: 800; }
+      .notice.saving { border-color: #d6a740; background: #fff7df; color: #7a4d00; }
+      .notice.error { border-color: #d8a1a1; background: #fdecec; color: #8a2d2d; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
+      input, textarea { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; }
+      textarea { min-height: 110px; resize: vertical; }
+      .wide { grid-column: 1 / -1; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+      button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+      button:disabled { cursor: wait; opacity: .62; }
+      a { color: #07576b; font-weight: 800; }
+      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>患者台帳</h1>
+      <p class="meta">患者ID: ${escapeHtml_(patientId)} / 表示年齢: ${escapeHtml_(history.age_text)}</p>
+      <p><a href="${escapeHtml_(historyUrl)}">便秘履歴へ戻る</a> / <a href="${escapeHtml_(entryUrl)}">医師入力を開く</a></p>
+      <p id="saveMessage" class="notice" ${params.message ? "" : "hidden"}>${params.message ? escapeHtml_(params.message) : ""}</p>
+
+      <form id="patientProfileForm" method="post" action="${escapeHtml_(formAction)}" target="_top">
+        <input type="hidden" name="action" value="savePatientProfile">
+        <input type="hidden" name="patient_id" value="${escapeHtml_(patientId)}">
+        <section class="panel">
+          <h2>基本情報</h2>
+          <div class="grid">
+            <label>生年月日
+              <input name="birth_date" type="date" value="${escapeHtml_(birthDateValue)}">
+            </label>
+            <label>現在の表示年齢
+              <input type="text" value="${escapeHtml_(history.age_text)}" readonly>
+            </label>
+            <label class="wide">台帳メモ
+              <textarea name="patient_note" placeholder="例: 年齢確認済み、家族からの補足など">${escapeHtml_(patient.note || "")}</textarea>
+            </label>
+          </div>
+          <p class="help">生年月日は患者向けURL、QR、ChatGPT貼り付け用テキストには直接出さず、医師側の年齢表示にだけ使います。</p>
+        </section>
+        <div class="actions">
+          <button type="button" id="savePatientProfileButton">患者台帳を保存</button>
+        </div>
+      </form>
+    </main>
+    <script>
+      const form = document.getElementById("patientProfileForm");
+      const message = document.getElementById("saveMessage");
+      const button = document.getElementById("savePatientProfileButton");
+
+      function setMessage(text, isError) {
+        message.textContent = text;
+        message.hidden = false;
+        message.classList.toggle("error", Boolean(isError));
+        message.classList.toggle("saving", false);
+        message.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function setSavingMessage(text) {
+        message.textContent = text;
+        message.hidden = false;
+        message.classList.remove("error");
+        message.classList.add("saving");
+        message.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function formObject() {
+        const data = {};
+        new FormData(form).forEach((value, key) => {
+          data[key] = value;
+        });
+        return data;
+      }
+
+      button.addEventListener("click", () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        button.dataset.originalText = button.dataset.originalText || button.textContent;
+        button.textContent = "保存中...";
+        setSavingMessage("保存中です。このままお待ちください。");
+        google.script.run
+          .withSuccessHandler((result) => {
+            button.disabled = false;
+            button.textContent = button.dataset.originalText;
+            setMessage((result && result.message) || "患者台帳を保存しました。", false);
+          })
+          .withFailureHandler((error) => {
+            button.disabled = false;
+            button.textContent = button.dataset.originalText;
+            setMessage("保存できませんでした: " + (error && error.message ? error.message : error), true);
+          })
+          .savePatientProfileFromForm(formObject());
       });
     </script>
   </body>

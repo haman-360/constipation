@@ -38,7 +38,8 @@
           <button id="copyEntryButton" class="button" type="button">医師入力URLコピー</button>
           <button id="copyDoctorButton" class="button" type="button">医師用URLコピー</button>
           <button id="copyHistoryButton" class="button" type="button">履歴URLコピー</button>
-          <button id="copyContextButton" class="button button--secondary" type="button">ChatGPT用URLコピー</button>
+          <button id="copyPreVisitContextButton" class="button button--secondary" type="button">診察前整理URLコピー</button>
+          <button id="copyTreatmentContextButton" class="button button--secondary" type="button">治療方針検討URLコピー</button>
         </div>
 
         <section class="link-output">
@@ -60,15 +61,21 @@
         </section>
 
         <section class="link-output">
-          <h2>ChatGPT貼り付け用テキスト</h2>
-          <pre id="contextUrlOutput"></pre>
-          <p><a id="contextOpenLink" href="#" target="_blank" rel="noreferrer">ChatGPT用テキストを開く</a></p>
+          <h2>ChatGPT診察前整理テキスト</h2>
+          <pre id="preVisitContextUrlOutput"></pre>
+          <p><a id="preVisitContextOpenLink" href="#" target="_blank" rel="noreferrer">診察前整理テキストを開く</a></p>
+        </section>
+
+        <section class="link-output">
+          <h2>ChatGPT治療方針検討テキスト</h2>
+          <pre id="treatmentContextUrlOutput"></pre>
+          <p><a id="treatmentContextOpenLink" href="#" target="_blank" rel="noreferrer">治療方針検討テキストを開く</a></p>
         </section>
 
         <p id="historyToolMessage" class="link-tool__message" aria-live="polite"></p>
       </section>
     </main>
 
-    <script src="./src/history-link.js?v=20260504-1"></script>
+    <script src="./src/history-link.js?v=20260505-1"></script>
   </body>
 </html>

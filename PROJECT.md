@@ -252,14 +252,14 @@ MVP → Google Sheets連携の動作確認済み段階
 - Sheets上で患者IDが `1234` のように見えていても、履歴取得時は `01234` と同じ5桁IDとして扱う。`setupSheets()` または `formatExistingSheets()` 実行でID列を文字列形式に整える。
 - `prescriptions` と `toilet_training` は、患者回答から自動推測せず、医師側で入力・管理する台帳として扱う。
 - `visit-link.html` で、患者ID・来院トークン入りの問診URLとQRを作成可能。
-- `history-link.html` で、医師用履歴表示、患者履歴JSON、ChatGPT貼り付け用テキストの確認URLを作成可能。
+- `history-link.html` で、医師用履歴表示、患者履歴JSON、ChatGPT診察前整理テキスト、ChatGPT治療方針検討テキストの確認URLを作成可能。
 - Apps Scriptの `doctorEntry` で、医師が `prescriptions` と `toilet_training` を手入力で追記可能。
 - `doctorEntry` は処方履歴だけ、トイレトレーニング履歴だけ、両方同時保存の3操作に対応する。
 - `prescriptions.date` と `toilet_training.date` は診察前確認で時系列を追えるよう日時（`yyyy-MM-dd HH:mm:ss`）で保存する。
 - 医師入力の保存後は入力画面へ戻し、ブラウザ更新で同じPOSTが再送信されにくい運用にする。
 - 便秘履歴ページとChatGPT貼り付け用テキストでは、`prescriptions` / `toilet_training` / `diary_weekly` を日本語ラベルで表示する。
 - 便秘履歴ページ上部に「診察前の確認」を置き、直近問診・直近処方・直近トイレトレーニング・直近週次日誌をまとめて表示する。
-- 便秘履歴ページ内のChatGPT貼り付け用テキストは、ページ内表示から1クリックでコピーできる。
+- 便秘履歴ページ内のChatGPT貼り付け用テキストは、診察前整理モードと医師向け治療方針検討モードを分けてページ内表示・コピーできる。
 - 患者向け最終画面では、院内保存中・保存完了・保存失敗を画面下部に固定表示し、保存完了までは閉じないよう案内する。
 - Macからの患者ID入りURL入力、iPhoneでのQR読み取りの双方で `visits` 保存成功を確認。
 - テスト患者の `patientHistory` と `chatGPTContext` の実データ出力確認済み。

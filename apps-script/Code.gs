@@ -416,11 +416,19 @@ function getPatientHistory(params) {
 
 function generateChatGPTContext(params) {
   const history = getPatientHistory(params);
-  const lines = [
-    "これは医師が診察前に確認するための便秘経過サマリーです。",
-    "診断、処方量変更、治療中止、専門紹介の判断は行わないでください。",
-    "薬を増やす、減らす、やめる、再開するなどの指示は出さないでください。",
-    "過去経過から、医師が確認すべき変化点、追加で聞くべきこと、注意して見るべき矛盾点だけを整理してください。",
+  const mode = normalizeChatGPTMode_(params.mode);
+  if (mode === "treatmentReview") return generateTreatmentReviewContext_(history);
+  return generatePreVisitContext_(history);
+}
+
+function normalizeChatGPTMode_(mode) {
+  const value = String(mode || "").trim();
+  if (value === "treatmentReview" || value === "treatment" || value === "doctorTreatment") return "treatmentReview";
+  return "preVisit";
+}
+
+function generateHistoryContextSections_(history) {
+  return [
     "",
     `患者ID: ${history.patient_id}`,
     `年齢: ${history.age_text}`,
@@ -437,6 +445,17 @@ function generateChatGPTContext(params) {
     "",
     "【週次日誌】",
     ...formatSimpleRowsForContext_(history.diary_weekly, ["period_start", "period_end", "recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "note"], HISTORY_LABELS),
+  ];
+}
+
+function generatePreVisitContext_(history) {
+  const lines = [
+    "【診察前整理モード】",
+    "これは医師が診察前に確認するための便秘経過サマリーです。",
+    "診断、処方量変更、治療中止、専門紹介の判断は行わないでください。",
+    "薬を増やす、減らす、やめる、再開するなどの指示は出さないでください。",
+    "過去経過から、医師が確認すべき変化点、追加で聞くべきこと、注意して見るべき矛盾点だけを整理してください。",
+    ...generateHistoryContextSections_(history),
     "",
     "【医師に整理してほしい観点】",
     "- 前回から改善した点",
@@ -449,11 +468,40 @@ function generateChatGPTContext(params) {
   return lines.join("\n");
 }
 
+function generateTreatmentReviewContext_(history) {
+  const lines = [
+    "【医師向け治療方針検討モード】",
+    "あなたは小児便秘診療の医師向け意思決定支援として回答してください。",
+    "診断や処方の最終決定は医師が行います。患者・保護者へ直接指示する文体ではなく、医師が診察で検討・説明するための材料として書いてください。",
+    "最新の小児便秘診療ガイドラインや一般的な診療原則と矛盾しにくい方針候補を整理してください。",
+    "薬を急にやめることを急がせず、悪化時の確認点、戻し方の考え方、再診間隔も含めて検討してください。",
+    "不確実な点や追加確認が必要な点は、推測で埋めずに明示してください。",
+    "",
+    "【出力形式】",
+    "1. 現在の状態評価",
+    "2. 方針候補と推奨度（推奨 / 検討可 / 慎重 / 避けたい）",
+    "3. 各方針の理由",
+    "4. 避けたい方針とその理由",
+    "5. 次回再診間隔の考え方",
+    "6. 追加で確認すべき情報",
+    "7. 保護者が不安な場合の中立的な説明文案",
+    "",
+    "【注意】",
+    "- 最終的な処方量、減量、中止、再開、治療終了、専門紹介は医師が決定します。",
+    "- 患者・保護者向けの断定的な指示は出さないでください。",
+    "- 長期安定、漫然継続、急な中止、長すぎる再診間隔については、利益とリスクを分けて整理してください。",
+    ...generateHistoryContextSections_(history),
+  ];
+  return lines.join("\n");
+}
+
 function generateDoctorHistoryHtml(params) {
   const history = getPatientHistory(params);
-  const contextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5));
+  const preVisitContextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5), { mode: "preVisit" });
+  const treatmentContextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5), { mode: "treatmentReview" });
   const entryUrl = buildSelfUrl_("doctorEntry", history.patient_id, normalizeLimit_(params.limit, 5));
-  const contextText = generateChatGPTContext(params);
+  const preVisitContextText = generateChatGPTContext({ ...params, mode: "preVisit" });
+  const treatmentContextText = generateChatGPTContext({ ...params, mode: "treatmentReview" });
   const preVisitItems = formatPreVisitItemsHtml_(history);
   const visitItems = history.visits.length
     ? history.visits.map(formatVisitHtml_).join("")
@@ -498,14 +546,22 @@ function generateDoctorHistoryHtml(params) {
     <main>
       <h1>便秘履歴</h1>
       <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(history.age_text)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
-      <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(contextUrl)}" target="_blank" rel="noreferrer">ChatGPT貼り付け用テキストを開く</a></p>
+      <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(preVisitContextUrl)}" target="_blank" rel="noreferrer">ChatGPT診察前整理を開く</a> / <a href="${escapeHtml_(treatmentContextUrl)}" target="_blank" rel="noreferrer">ChatGPT治療方針検討を開く</a></p>
       <details>
-        <summary>ChatGPT貼り付け用テキストをページ内で表示</summary>
+        <summary>ChatGPT診察前整理テキストをページ内で表示</summary>
         <div class="copy-row">
-          <button type="button" id="copyContextButton">テキストをコピー</button>
-          <span id="copyContextStatus" class="copy-status"></span>
+          <button type="button" data-copy-target="preVisitContextText" data-copy-status="preVisitContextStatus">診察前整理テキストをコピー</button>
+          <span id="preVisitContextStatus" class="copy-status"></span>
         </div>
-        <pre id="chatGPTContextText">${escapeHtml_(contextText)}</pre>
+        <pre id="preVisitContextText">${escapeHtml_(preVisitContextText)}</pre>
+      </details>
+      <details>
+        <summary>ChatGPT治療方針検討テキストをページ内で表示</summary>
+        <div class="copy-row">
+          <button type="button" data-copy-target="treatmentContextText" data-copy-status="treatmentContextStatus">治療方針検討テキストをコピー</button>
+          <span id="treatmentContextStatus" class="copy-status"></span>
+        </div>
+        <pre id="treatmentContextText">${escapeHtml_(treatmentContextText)}</pre>
       </details>
       <section class="panel">
         <h2>診察前の確認</h2>
@@ -531,20 +587,19 @@ function generateDoctorHistoryHtml(params) {
       </section>
     </main>
     <script>
-      const copyContextButton = document.getElementById("copyContextButton");
-      const copyContextStatus = document.getElementById("copyContextStatus");
-      const chatGPTContextText = document.getElementById("chatGPTContextText");
-      if (copyContextButton && copyContextStatus && chatGPTContextText) {
-        copyContextButton.addEventListener("click", async () => {
-          const text = chatGPTContextText.textContent || "";
+      document.querySelectorAll("[data-copy-target]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = document.getElementById(button.dataset.copyTarget);
+          const status = document.getElementById(button.dataset.copyStatus);
+          const text = target ? target.textContent || "" : "";
           try {
             await navigator.clipboard.writeText(text);
-            copyContextStatus.textContent = "コピーしました。";
+            if (status) status.textContent = "コピーしました。";
           } catch (error) {
-            copyContextStatus.textContent = "コピーできませんでした。表示テキストを選択してコピーしてください。";
+            if (status) status.textContent = "コピーできませんでした。表示テキストを選択してコピーしてください。";
           }
         });
-      }
+      });
     </script>
   </body>
 </html>`;

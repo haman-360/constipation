@@ -470,7 +470,10 @@ function getPatientHistory(params) {
     diary_weekly: latestByDate_(rowsForPatient_(SHEET_NAMES.diaryWeekly, DIARY_WEEKLY_HEADERS, patientId), limit, "period_end"),
   };
   history.patient = getPatient_(patientId);
-  history.age_text = patientAgeText_(history.patient, history.visits[0] && (history.visits[0].submitted_at || history.visits[0].saved_at));
+  const ageReferenceDate = history.visits[0] && (history.visits[0].submitted_at || history.visits[0].saved_at);
+  history.age_text = patientAgeText_(history.patient, ageReferenceDate);
+  history.age_profile = patientAgeProfile_(history.patient, ageReferenceDate);
+  history.age_profile_label = ageProfileLabel_(history.age_profile);
   return history;
 }
 
@@ -493,6 +496,7 @@ function generateHistoryContextSections_(history) {
     "",
     `患者ID: ${history.patient_id}`,
     `年齢: ${history.age_text}`,
+    `年齢プロファイル: ${history.age_profile}（${history.age_profile_label}）`,
     `対象履歴: 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件`,
     "",
     "【受診・問診履歴】",
@@ -516,6 +520,7 @@ function generatePreVisitContext_(history) {
     "診断、処方量変更、治療中止、専門紹介の判断は行わないでください。",
     "薬を増やす、減らす、やめる、再開するなどの指示は出さないでください。",
     "過去経過から、医師が確認すべき変化点、追加で聞くべきこと、注意して見るべき矛盾点だけを整理してください。",
+    ...ageProfileContextLines_(history, "preVisit"),
     ...generateHistoryContextSections_(history),
     "",
     "【医師に整理してほしい観点】",
@@ -554,6 +559,7 @@ function generateTreatmentReviewContext_(history) {
     "- 患者・保護者向けの断定的な指示は出さないでください。",
     "- 具体的な処方量変更の数値指示は出さず、方針候補として段階的減量、同量短期継続、再評価などを整理してください。",
     "- 長期安定、漫然継続、急な中止、長すぎる再診間隔については、利益とリスクを分けて整理してください。",
+    ...ageProfileContextLines_(history, "treatmentReview"),
     ...generateHistoryContextSections_(history),
   ];
   return lines.join("\n");
@@ -610,7 +616,7 @@ function generateDoctorHistoryHtml(params) {
   <body>
     <main>
       <h1>便秘履歴</h1>
-      <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(history.age_text)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
+      <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(history.age_text)} / 年齢プロファイル: ${escapeHtml_(history.age_profile_label)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
       <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(profileUrl)}">患者台帳を開く</a> / <a href="${escapeHtml_(preVisitContextUrl)}" target="_blank" rel="noreferrer">ChatGPT診察前整理を開く</a> / <a href="${escapeHtml_(treatmentContextUrl)}" target="_blank" rel="noreferrer">ChatGPT治療方針検討を開く</a></p>
       <details>
         <summary>ChatGPT診察前整理テキストをページ内で表示</summary>
@@ -686,10 +692,26 @@ function patientAgeText_(patient, referenceDateValue) {
   return `${years}${months}` || "未確認";
 }
 
-function ageTextFromBirthDate_(birthDateValue, referenceDateValue) {
+function patientAgeProfile_(patient, referenceDateValue) {
+  if (!patient) return "unknown";
+  const ageMonths = ageMonthsFromBirthDate_(patient.birth_date, referenceDateValue);
+  if (ageMonths === null) return "unknown";
+  if (ageMonths < 24) return "infant";
+  if (ageMonths < 48) return "toddler";
+  return "child";
+}
+
+function ageProfileLabel_(profile) {
+  if (profile === "infant") return "0-1歳";
+  if (profile === "toddler") return "2-3歳";
+  if (profile === "child") return "4歳以降";
+  return "年齢未確認";
+}
+
+function ageMonthsFromBirthDate_(birthDateValue, referenceDateValue) {
   const birthDate = parseDateOnly_(birthDateValue);
   const referenceDate = parseDateOnly_(referenceDateValue || new Date());
-  if (!birthDate || !referenceDate || referenceDate < birthDate) return "";
+  if (!birthDate || !referenceDate || referenceDate < birthDate) return null;
 
   let years = referenceDate.getUTCFullYear() - birthDate.getUTCFullYear();
   let months = referenceDate.getUTCMonth() - birthDate.getUTCMonth();
@@ -698,8 +720,91 @@ function ageTextFromBirthDate_(birthDateValue, referenceDateValue) {
     years -= 1;
     months += 12;
   }
-  if (years < 0) return "";
+  if (years < 0) return null;
+  return years * 12 + months;
+}
+
+function ageTextFromBirthDate_(birthDateValue, referenceDateValue) {
+  const ageMonths = ageMonthsFromBirthDate_(birthDateValue, referenceDateValue);
+  if (ageMonths === null) return "";
+  const years = Math.floor(ageMonths / 12);
+  const months = ageMonths % 12;
   return `${years}歳${months}か月`;
+}
+
+function ageProfileContextLines_(history, mode) {
+  const profile = history.age_profile || "unknown";
+  const profileLabel = history.age_profile_label || ageProfileLabel_(profile);
+  const common = [
+    "",
+    "【年齢プロファイル】",
+    `対象年齢層: ${profile}（${profileLabel}）`,
+    `年齢表示: ${history.age_text || "未確認"}`,
+  ];
+  if (profile === "unknown") {
+    return [
+      ...common,
+      "",
+      "【この年齢層で特に確認する観点】",
+      "- 年齢未確認です。患者台帳の生年月日を確認してください。",
+      "- 問診内容は現MVPの2-3歳向け質問セットとして扱い、年齢に依存する判断は保留してください。",
+    ];
+  }
+  return [
+    ...common,
+    "",
+    "【この年齢層で特に確認する観点】",
+    ...ageProfileFocusLines_(profile, mode),
+  ];
+}
+
+function ageProfileFocusLines_(profile, mode) {
+  if (profile === "infant") {
+    if (mode === "treatmentReview") {
+      return [
+        "- 薬の方針候補を出す前に、哺乳、体重、嘔吐、腹部膨満、発症時期、出生時・1か月健診の指摘が十分に確認されているか整理する。",
+        "- 牛乳アレルギーや背景疾患を断定せず、不足情報や追加確認候補として扱う。",
+        "- 浣腸、綿棒刺激、市販薬について、具体的な頻度指示は出さない。",
+      ];
+    }
+    return [
+      "- 出生時や1か月健診で指摘があったか。",
+      "- 出生直後または生後早期から便秘が続いているか。",
+      "- 哺乳量、食事量、体重増加、嘔吐、腹部膨満、発熱、活気低下があるか。",
+      "- 離乳食開始やミルク変更と便秘の時期関係があるか。",
+      "- 浣腸、綿棒刺激、市販薬の使用頻度が不明でないか。",
+    ];
+  }
+  if (profile === "child") {
+    if (mode === "treatmentReview") {
+      return [
+        "- 便失禁や園・学校での排便回避がある場合、薬の方針だけでなく生活場面の支援も検討材料として整理する。",
+        "- 発達相談、他院通院中の病気、他院処方薬は、便秘との関係を断定せず不足情報として明示する。",
+        "- 本人と保護者の困りごとや治療目標のずれがないか整理する。",
+      ];
+    }
+    return [
+      "- 園・学校で排便できるか。",
+      "- 便失禁、下着汚れ、本人の自覚があるか。",
+      "- 腹痛、食欲低下、嘔吐、腹部膨満があるか。",
+      "- 偏食、水分不足、朝のトイレ時間不足、生活リズムの乱れがあるか。",
+      "- 本人と保護者の困りごとや目標がずれていないか。",
+    ];
+  }
+  if (mode === "treatmentReview") {
+    return [
+      "- 長期安定例では、段階的減量を独立した方針候補として評価する。",
+      "- 減量や飲み忘れ後に硬便、痛み、がまんが再燃している場合は、急な中止や減量継続を慎重に扱う。",
+      "- トイレトレーニングの進み具合と痛み、がまんを分けて整理する。",
+    ];
+  }
+  return [
+    "- 排便頻度、便の硬さ、排便時痛、がまんの変化。",
+    "- 薬の飲み忘れ、少なめ、中止、飲みにくさと便性状の関係。",
+    "- トイレトレーニング状況と痛み、がまん、便失禁の関係。",
+    "- 直近日誌の排便日数、硬便日数、痛みの日、内服できた日。",
+    "- 保護者が薬の継続、減量、中止にどの程度不安を持っているか。",
+  ];
 }
 
 function parseDateOnly_(value) {
@@ -1007,7 +1112,7 @@ function generatePatientProfileHtml(params) {
   <body>
     <main>
       <h1>患者台帳</h1>
-      <p class="meta">患者ID: ${escapeHtml_(patientId)} / 表示年齢: ${escapeHtml_(history.age_text)}</p>
+      <p class="meta">患者ID: ${escapeHtml_(patientId)} / 表示年齢: ${escapeHtml_(history.age_text)} / 年齢プロファイル: ${escapeHtml_(history.age_profile_label)}</p>
       <p><a href="${escapeHtml_(historyUrl)}">便秘履歴へ戻る</a> / <a href="${escapeHtml_(entryUrl)}">医師入力を開く</a></p>
       <p id="saveMessage" class="notice" ${params.message ? "" : "hidden"}>${params.message ? escapeHtml_(params.message) : ""}</p>
 
@@ -1022,6 +1127,9 @@ function generatePatientProfileHtml(params) {
             </label>
             <label>現在の表示年齢
               <input type="text" value="${escapeHtml_(history.age_text)}" readonly>
+            </label>
+            <label>年齢プロファイル
+              <input type="text" value="${escapeHtml_(history.age_profile_label)}" readonly>
             </label>
             <label class="wide">台帳メモ
               <textarea name="patient_note" placeholder="例: 年齢確認済み、家族からの補足など">${escapeHtml_(patient.note || "")}</textarea>

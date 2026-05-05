@@ -35,10 +35,6 @@ const state = {
   index: 0,
   answers: {},
   diary: {},
-  patientMeta: {
-    age_years: "",
-    age_months: "",
-  },
   submitted: false,
   dashboardMode: "full",
 };
@@ -220,46 +216,13 @@ function renderIntro() {
       わかる範囲で、近いものを選んでください。<br>
       薬の量をこの画面で決めることはありません。</p>
       <p class="intro-save-note">最後に院内保存の完了表示が出るまで、この画面を閉じずにお待ちください。入力内容は最後にメモとしてコピーできます。</p>
-      <section class="age-entry" aria-label="年齢">
-        <h2>年齢</h2>
-        <p>わかる場合だけ入力してください。患者台帳に生年月日がある場合は、履歴画面で自動計算します。</p>
-        <div class="age-entry__grid">
-          <label>
-            <span>歳</span>
-            <select id="ageYearsInput" class="select-input">
-              <option value="">選択</option>
-              ${Array.from({ length: 19 }, (_, index) => `<option value="${index}" ${String(state.patientMeta.age_years) === String(index) ? "selected" : ""}>${index}歳</option>`).join("")}
-            </select>
-          </label>
-          <label>
-            <span>か月</span>
-            <select id="ageMonthsInput" class="select-input">
-              <option value="">選択</option>
-              ${Array.from({ length: 12 }, (_, index) => `<option value="${index}" ${String(state.patientMeta.age_months) === String(index) ? "selected" : ""}>${index}か月</option>`).join("")}
-            </select>
-          </label>
-        </div>
-      </section>
       <button id="startButton" class="button" type="button">はじめる</button>
     </div>
   `;
-  wireAgeEntry();
   document.getElementById("startButton").addEventListener("click", () => {
     state.started = true;
     state.index = 0;
     render();
-  });
-}
-
-function wireAgeEntry() {
-  const years = document.getElementById("ageYearsInput");
-  const months = document.getElementById("ageMonthsInput");
-  if (!years || !months) return;
-  years.addEventListener("change", () => {
-    state.patientMeta.age_years = years.value;
-  });
-  months.addEventListener("change", () => {
-    state.patientMeta.age_months = months.value;
   });
 }
 
@@ -416,7 +379,6 @@ function renderFinish() {
 function buildPayload() {
   return mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(state.answers), normalizeDiaryAnswers(state.diary)), {
     ...visitMetaFromUrl,
-    ...state.patientMeta,
     submitted_at: new Date().toISOString(),
   });
 }
@@ -483,7 +445,6 @@ function renderSubmitted() {
     state.index = 0;
     state.answers = {};
     state.diary = {};
-    state.patientMeta = { age_years: "", age_months: "" };
     state.submitted = false;
     state.dashboardMode = "full";
     render();

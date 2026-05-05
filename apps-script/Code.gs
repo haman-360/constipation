@@ -14,6 +14,7 @@ const PATIENTS_HEADERS = [
   "age_months",
   "created_at",
   "note",
+  "birth_date",
 ];
 
 const VISITS_HEADERS = [
@@ -91,7 +92,7 @@ const HISTORY_LABELS = {
 };
 
 const SHEET_DEFINITIONS = [
-  { name: SHEET_NAMES.patients, headers: PATIENTS_HEADERS, widths: [110, 90, 105, 160, 260], plainTextHeaders: ["patient_id"] },
+  { name: SHEET_NAMES.patients, headers: PATIENTS_HEADERS, widths: [110, 90, 105, 160, 260, 120], plainTextHeaders: ["patient_id"], dateHeaders: ["birth_date"] },
   {
     name: SHEET_NAMES.visits,
     headers: VISITS_HEADERS,
@@ -273,6 +274,7 @@ function upsertPatient_(patientId, createdAt, ageYears, ageMonths) {
   const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
   const existingRow = findPatientRow_(sheet, patientId);
   if (existingRow) {
+    sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
     updatePatientAgeIfPresent_(sheet, existingRow, ageYears, ageMonths);
     return false;
   }
@@ -282,7 +284,9 @@ function upsertPatient_(patientId, createdAt, ageYears, ageMonths) {
     ageOrBlank_(ageMonths, 11),
     createdAt,
     "",
+    "",
   ]);
+  sheet.getRange(sheet.getLastRow(), 1).setNumberFormat("@").setValue(patientId);
   return true;
 }
 
@@ -291,7 +295,7 @@ function findPatientRow_(sheet, patientId) {
   if (lastRow < 2) return 0;
   const values = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
   for (let index = 0; index < values.length; index += 1) {
-    if (normalizePatientId_(values[index][0]) === patientId) return index + 2;
+    if (patientIdKey_(values[index][0]) === patientId) return index + 2;
   }
   return 0;
 }
@@ -396,15 +400,17 @@ function getPatientHistory(params) {
   const limit = normalizeLimit_(params.limit, 5);
   if (!patientId) throw new Error("patient_id is required.");
 
-  return {
+  const history = {
     ok: true,
     patient_id: patientId,
-    patient: getPatient_(patientId),
     visits: latestByDate_(rowsForPatient_(SHEET_NAMES.visits, VISITS_HEADERS, patientId).map(parseVisitRow_), limit, "submitted_at"),
     prescriptions: latestByDate_(rowsForPatient_(SHEET_NAMES.prescriptions, PRESCRIPTIONS_HEADERS, patientId), limit, "date"),
     toilet_training: latestByDate_(rowsForPatient_(SHEET_NAMES.toiletTraining, TOILET_TRAINING_HEADERS, patientId), limit, "date"),
     diary_weekly: latestByDate_(rowsForPatient_(SHEET_NAMES.diaryWeekly, DIARY_WEEKLY_HEADERS, patientId), limit, "period_end"),
   };
+  history.patient = getPatient_(patientId);
+  history.age_text = patientAgeText_(history.patient, history.visits[0] && (history.visits[0].submitted_at || history.visits[0].saved_at));
+  return history;
 }
 
 
@@ -417,7 +423,7 @@ function generateChatGPTContext(params) {
     "過去経過から、医師が確認すべき変化点、追加で聞くべきこと、注意して見るべき矛盾点だけを整理してください。",
     "",
     `患者ID: ${history.patient_id}`,
-    `年齢: ${patientAgeText_(history.patient)}`,
+    `年齢: ${history.age_text}`,
     `対象履歴: 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件`,
     "",
     "【受診・問診履歴】",
@@ -491,7 +497,7 @@ function generateDoctorHistoryHtml(params) {
   <body>
     <main>
       <h1>便秘履歴</h1>
-      <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(patientAgeText_(history.patient))} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
+      <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(history.age_text)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
       <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(contextUrl)}" target="_blank" rel="noreferrer">ChatGPT貼り付け用テキストを開く</a></p>
       <details>
         <summary>ChatGPT貼り付け用テキストをページ内で表示</summary>
@@ -548,14 +554,47 @@ function getPatient_(patientId) {
   return rowsForPatient_(SHEET_NAMES.patients, PATIENTS_HEADERS, patientId)[0] || {};
 }
 
-function patientAgeText_(patient) {
+function patientAgeText_(patient, referenceDateValue) {
   if (!patient) return "未確認";
+  const ageFromBirthDate = ageTextFromBirthDate_(patient.birth_date, referenceDateValue);
+  if (ageFromBirthDate) return ageFromBirthDate;
   const hasYears = patient.age_years !== "" && patient.age_years !== null && patient.age_years !== undefined;
   const hasMonths = patient.age_months !== "" && patient.age_months !== null && patient.age_months !== undefined;
   if (!hasYears && !hasMonths) return "未確認";
   const years = hasYears ? `${patient.age_years}歳` : "";
   const months = hasMonths ? `${patient.age_months}か月` : "";
   return `${years}${months}` || "未確認";
+}
+
+function ageTextFromBirthDate_(birthDateValue, referenceDateValue) {
+  const birthDate = parseDateOnly_(birthDateValue);
+  const referenceDate = parseDateOnly_(referenceDateValue || new Date());
+  if (!birthDate || !referenceDate || referenceDate < birthDate) return "";
+
+  let years = referenceDate.getUTCFullYear() - birthDate.getUTCFullYear();
+  let months = referenceDate.getUTCMonth() - birthDate.getUTCMonth();
+  if (referenceDate.getUTCDate() < birthDate.getUTCDate()) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (years < 0) return "";
+  return `${years}歳${months}か月`;
+}
+
+function parseDateOnly_(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()));
+  }
+  const text = String(value).trim();
+  const match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (!match) return null;
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 function formatPreVisitItemsHtml_(history) {
@@ -963,7 +1002,7 @@ function validateSubmitVisitPayload_(payload) {
 
 
 function rowsForPatient_(sheetName, headers, patientId) {
-  return readSheetObjects_(sheetName, headers).filter((row) => String(row.patient_id || "") === patientId);
+  return readSheetObjects_(sheetName, headers).filter((row) => patientIdKey_(row.patient_id) === patientId);
 }
 
 function readSheetObjects_(sheetName, headers) {
@@ -1004,6 +1043,11 @@ function latestByDate_(rows, limit, dateKey) {
 
 function normalizePatientId_(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 5);
+}
+
+function patientIdKey_(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 5);
+  return digits ? digits.padStart(5, "0") : "";
 }
 
 function requirePatientId_(value) {
@@ -1062,6 +1106,7 @@ function formatTemplateSheet_(sheet, definition) {
 
   applyColumnWidths_(sheet, headers, definition.widths || []);
   applyPlainTextColumns_(sheet, headers, definition.plainTextHeaders || []);
+  applyDateColumns_(sheet, headers, definition.dateHeaders || []);
   applyDateTimeColumns_(sheet, headers, definition.dateTimeHeaders || []);
   hideColumnsByHeader_(sheet, headers, definition.hiddenHeaders || []);
   if (!sheet.getFilter()) {
@@ -1093,6 +1138,15 @@ function applyDateTimeColumns_(sheet, headers, dateTimeHeaders) {
     if (dateTimeHeaders.includes(header)) {
       sheet.getRange(2, index + 1, sheet.getMaxRows() - 1, 1)
         .setNumberFormat("yyyy-mm-dd hh:mm:ss");
+    }
+  });
+}
+
+function applyDateColumns_(sheet, headers, dateHeaders) {
+  headers.forEach((header, index) => {
+    if (dateHeaders.includes(header)) {
+      sheet.getRange(2, index + 1, sheet.getMaxRows() - 1, 1)
+        .setNumberFormat("yyyy-mm-dd");
     }
   });
 }

@@ -55,7 +55,7 @@
 
 ### 問診機能
 
-- 年齢入力（歳・か月）
+- 年齢入力（歳・か月、任意）
 - 基本6問
 - 条件分岐による追加質問
 - 医療者監修後の保護者向け文言調整
@@ -248,6 +248,8 @@ MVP → Google Sheets連携の動作確認済み段階
 - Google Sheetsの `patient_id` / `visit_id` / `visit_token` 等のID列は文字列形式に固定する。
 - `submitVisit` 保存時に、未登録患者IDを `patients` へ自動追加し、直近日誌入力がある場合は `diary_weekly` へ自動保存する。
 - 問診開始時に入力した年齢（歳・か月）は `patients` に保存し、便秘履歴とChatGPT貼り付け用テキストに表示する。
+- `patients.birth_date` に生年月日を入力しておくと、便秘履歴とChatGPT貼り付け用テキストでは直近受診日を基準に年齢を自動計算する。
+- Sheets上で患者IDが `1234` のように見えていても、履歴取得時は `01234` と同じ5桁IDとして扱う。`setupSheets()` または `formatExistingSheets()` 実行でID列を文字列形式に整える。
 - `prescriptions` と `toilet_training` は、患者回答から自動推測せず、医師側で入力・管理する台帳として扱う。
 - `visit-link.html` で、患者ID・来院トークン入りの問診URLとQRを作成可能。
 - `history-link.html` で、医師用履歴表示、患者履歴JSON、ChatGPT貼り付け用テキストの確認URLを作成可能。

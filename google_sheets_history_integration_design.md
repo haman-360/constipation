@@ -109,6 +109,7 @@
 | age_months | 月齢 |
 | created_at | 初回登録日時 |
 | note | 医師用メモ |
+| birth_date | 生年月日。入力されている場合は受診日から年齢を自動計算する |
 
 ### visits
 

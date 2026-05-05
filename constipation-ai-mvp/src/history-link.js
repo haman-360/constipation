@@ -2,12 +2,12 @@ const els = {
   patientId: document.getElementById("patientIdInput"),
   limit: document.getElementById("limitInput"),
   webAppUrl: document.getElementById("webAppUrlInput"),
-  copyEntryButton: document.getElementById("copyEntryButton"),
-  copyProfileButton: document.getElementById("copyProfileButton"),
-  copyDoctorButton: document.getElementById("copyDoctorButton"),
-  copyHistoryButton: document.getElementById("copyHistoryButton"),
-  copyPreVisitContextButton: document.getElementById("copyPreVisitContextButton"),
-  copyTreatmentContextButton: document.getElementById("copyTreatmentContextButton"),
+  openEntryButton: document.getElementById("openEntryButton"),
+  openProfileButton: document.getElementById("openProfileButton"),
+  openDoctorButton: document.getElementById("openDoctorButton"),
+  openHistoryButton: document.getElementById("openHistoryButton"),
+  openPreVisitContextButton: document.getElementById("openPreVisitContextButton"),
+  openTreatmentContextButton: document.getElementById("openTreatmentContextButton"),
   entryUrlOutput: document.getElementById("entryUrlOutput"),
   profileUrlOutput: document.getElementById("profileUrlOutput"),
   doctorUrlOutput: document.getElementById("doctorUrlOutput"),
@@ -75,12 +75,12 @@ function updateOutput() {
   const treatmentContextUrl = buildActionUrl("chatGPTContext", { mode: "treatmentReview" });
   const ready = Boolean(entryUrl && profileUrl && doctorUrl && historyUrl && preVisitContextUrl && treatmentContextUrl);
 
-  els.copyEntryButton.disabled = !ready;
-  els.copyProfileButton.disabled = !ready;
-  els.copyDoctorButton.disabled = !ready;
-  els.copyHistoryButton.disabled = !ready;
-  els.copyPreVisitContextButton.disabled = !ready;
-  els.copyTreatmentContextButton.disabled = !ready;
+  els.openEntryButton.disabled = !ready;
+  els.openProfileButton.disabled = !ready;
+  els.openDoctorButton.disabled = !ready;
+  els.openHistoryButton.disabled = !ready;
+  els.openPreVisitContextButton.disabled = !ready;
+  els.openTreatmentContextButton.disabled = !ready;
   els.entryUrlOutput.textContent = entryUrl || "患者IDとWeb App URLを入力してください。";
   els.profileUrlOutput.textContent = profileUrl || "患者IDとWeb App URLを入力してください。";
   els.doctorUrlOutput.textContent = doctorUrl || "患者IDとWeb App URLを入力してください。";
@@ -111,34 +111,13 @@ function updateOutput() {
   }
 }
 
-async function copyText(text, button, doneLabel) {
+function openUrl(text) {
   if (!text) {
     els.message.textContent = "患者IDとWeb App URLを入力してください。";
     return;
   }
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch (error) {
-    fallbackCopyText(text);
-  }
-  const original = button.textContent;
-  button.textContent = doneLabel;
-  els.message.textContent = "URLをコピーしました。";
-  setTimeout(() => {
-    button.textContent = original;
-  }, 1200);
-}
-
-function fallbackCopyText(text) {
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  textarea.remove();
+  window.open(text, "_blank", "noopener,noreferrer");
+  els.message.textContent = "ページを開きました。";
 }
 
 els.webAppUrl.value = localStorage.getItem("constipation_web_app_url") || DEFAULT_WEB_APP_URL;
@@ -150,11 +129,11 @@ els.webAppUrl.value = localStorage.getItem("constipation_web_app_url") || DEFAUL
   });
 });
 
-els.copyEntryButton.addEventListener("click", () => copyText(buildActionUrl("doctorEntry"), els.copyEntryButton, "医師入力URLコピー済み"));
-els.copyProfileButton.addEventListener("click", () => copyText(buildActionUrl("patientProfile"), els.copyProfileButton, "患者台帳URLコピー済み"));
-els.copyDoctorButton.addEventListener("click", () => copyText(buildActionUrl("doctorHistory"), els.copyDoctorButton, "医師用URLコピー済み"));
-els.copyHistoryButton.addEventListener("click", () => copyText(buildActionUrl("patientHistory"), els.copyHistoryButton, "履歴URLコピー済み"));
-els.copyPreVisitContextButton.addEventListener("click", () => copyText(buildActionUrl("chatGPTContext", { mode: "preVisit" }), els.copyPreVisitContextButton, "診察前整理URLコピー済み"));
-els.copyTreatmentContextButton.addEventListener("click", () => copyText(buildActionUrl("chatGPTContext", { mode: "treatmentReview" }), els.copyTreatmentContextButton, "治療方針検討URLコピー済み"));
+els.openEntryButton.addEventListener("click", () => openUrl(buildActionUrl("doctorEntry")));
+els.openProfileButton.addEventListener("click", () => openUrl(buildActionUrl("patientProfile")));
+els.openDoctorButton.addEventListener("click", () => openUrl(buildActionUrl("doctorHistory")));
+els.openHistoryButton.addEventListener("click", () => openUrl(buildActionUrl("patientHistory")));
+els.openPreVisitContextButton.addEventListener("click", () => openUrl(buildActionUrl("chatGPTContext", { mode: "preVisit" })));
+els.openTreatmentContextButton.addEventListener("click", () => openUrl(buildActionUrl("chatGPTContext", { mode: "treatmentReview" })));
 
 updateOutput();

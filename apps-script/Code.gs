@@ -130,6 +130,9 @@ function doGet(e) {
     if (action === "patientProfile") {
       return htmlResponse_(generatePatientProfileHtml(e.parameter || {}));
     }
+    if (action === "patientProfileData") {
+      return jsonResponse_(getPatientProfileData(e.parameter || {}));
+    }
     throw new Error(`Unsupported action: ${action}`);
   } catch (error) {
     return jsonResponse_({ ok: false, error: String(error.message || error) }, 400);
@@ -183,9 +186,10 @@ function submitVisit(payload) {
 
   const patientSaved = upsertPatient_(patientId, savedAt, payload.age_years, payload.age_months);
   const patient = getPatient_(patientId);
-  const ageProfile = patientAgeProfile_(patient, submittedAt);
+  const calculatedAgeProfile = patientAgeProfile_(patient, submittedAt);
+  const ageProfile = calculatedAgeProfile === "unknown" ? normalizeAgeProfile_(payload.age_profile) : calculatedAgeProfile;
   const ageTextAtVisit = patientAgeText_(patient, submittedAt);
-  const questionnaireVersion = "toddler-mvp-v1";
+  const questionnaireVersion = normalizeQuestionnaireVersion_(payload.questionnaire_version, ageProfile);
   sheet.appendRow([
     visitId,
     patientId,
@@ -711,6 +715,21 @@ function getPatient_(patientId) {
   return rowsForPatient_(SHEET_NAMES.patients, PATIENTS_HEADERS, patientId)[0] || {};
 }
 
+function getPatientProfileData(params) {
+  const patientId = requirePatientId_(params.patient_id || params.pid);
+  const referenceDate = dateTimeInScriptTimezone_(new Date());
+  const patient = getPatient_(patientId);
+  const ageProfile = patientAgeProfile_(patient, referenceDate);
+  return {
+    ok: true,
+    patient_id: patientId,
+    age_text: patientAgeText_(patient, referenceDate),
+    age_profile: ageProfile,
+    age_profile_label: ageProfileLabel_(ageProfile),
+    questionnaire_version: normalizeQuestionnaireVersion_("", ageProfile),
+  };
+}
+
 function patientAgeText_(patient, referenceDateValue) {
   if (!patient) return "未確認";
   const ageFromBirthDate = ageTextFromBirthDate_(patient.birth_date, referenceDateValue);
@@ -737,6 +756,19 @@ function ageProfileLabel_(profile) {
   if (profile === "toddler") return "2-3歳";
   if (profile === "child") return "4歳以降";
   return "年齢未確認";
+}
+
+function normalizeAgeProfile_(value) {
+  const profile = String(value || "").trim();
+  return ["infant", "toddler", "child", "unknown"].includes(profile) ? profile : "unknown";
+}
+
+function normalizeQuestionnaireVersion_(value, ageProfile) {
+  const text = String(value || "").replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 40);
+  if (text) return text;
+  if (ageProfile === "infant") return "infant-prototype-v1";
+  if (ageProfile === "child") return "child-prototype-v1";
+  return "toddler-mvp-v1";
 }
 
 function ageMonthsFromBirthDate_(birthDateValue, referenceDateValue) {

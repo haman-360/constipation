@@ -21,6 +21,7 @@
 
 - [ ] GitHub Pagesの3 URLが開く
 - [ ] Apps Scriptの `setupSheets()` が実行済み
+- [ ] `Code.gs` の列定義を変更した後は、再デプロイ後に `setupSheets()` を再実行済み
 - [ ] Google Sheetsに `patients` / `visits` / `prescriptions` / `toilet_training` / `diary_weekly` がある
 - [ ] Apps Script Web Appの `/exec` URLが現在の保存先として使える
 - [ ] `history-link.html` のWeb App URL欄は通常変更不要。URLを再デプロイで作り直した場合だけ変更する
@@ -80,6 +81,9 @@
 - [ ] 便秘履歴画面に戻ると、保存した処方・トイレトレーニングが表示される
 - [ ] 便秘履歴画面とChatGPT貼り付け用テキストに、生年月日ではなく年齢表示だけが出る
 - [ ] `visits` に `age_profile`、`age_text_at_visit`、`questionnaire_version` が保存される
+- [ ] 生年月日が0-1歳のテストIDでは、0-1歳向け質問セットが表示される
+- [ ] 生年月日が4歳以降のテストIDでは、4歳以降向け質問セットが表示される
+- [ ] 生年月日未登録または照会失敗時は、2-3歳向けMVP質問セットで続行できる
 
 ## 合格条件
 

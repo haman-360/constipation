@@ -1350,6 +1350,55 @@ assert.deepStrictEqual(decodedShortQr.q13_med_difficulty_reason, ["味が苦手"
 assert.strictEqual(decodedShortQr.diary_longest_no_bowel_days, 4, "SHORT-QR: decoded diary mismatch");
 assert(!Object.prototype.hasOwnProperty.call(decodedShortQr, "diary_note"), "SHORT-QR: decoded payload should not include diary note");
 
+const infantInput = mergeVisitMeta({
+  i1_last_bowel_movement: "4日以上前",
+  i2_stool_consistency: "硬い",
+  i3_stool_behavior: ["泣く、痛がる", "血がつくことがある"],
+  i4_onset: "生後数週間以内から",
+  i5_birth_check: "ある",
+  i5_birth_check_note: "1か月健診で相談",
+  i6_feeding: ["最近飲む量、食べる量が減った", "吐くことが増えた"],
+  i7_milk_dairy: ["湿疹、血便、吐き戻しなども気になる"],
+  i8_abdominal_condition: ["張っているように見える", "吐くことがある"],
+  i9_growth: "最近体重が増えにくい気がする",
+  i10_constipation_support: ["医師から処方された薬", "綿棒刺激"],
+  i10_support_note: "週数回",
+}, { age_profile: "infant", patient_id: "00999", visit_token: "inf1" });
+assert(visibleFieldIds(infantInput).includes("i4_onset"), "INFANT-PROFILE: infant fields should be visible");
+assert(!visibleFieldIds(infantInput).includes("q6_med_status"), "INFANT-PROFILE: toddler medicine field should not be visible");
+const infantPayload = generateSheetsVisitPayload(infantInput);
+assert.strictEqual(infantPayload.age_profile, "infant", "INFANT-PROFILE: age profile mismatch");
+assert.strictEqual(infantPayload.questionnaire_version, "infant-prototype-v1", "INFANT-PROFILE: questionnaire version mismatch");
+assert(Object.prototype.hasOwnProperty.call(infantPayload.questionnaire, "i4_onset"), "INFANT-PROFILE: questionnaire should contain infant onset");
+assert(!Object.prototype.hasOwnProperty.call(infantPayload.questionnaire, "q6_med_status"), "INFANT-PROFILE: questionnaire should not contain toddler field");
+assert(infantPayload.outputs.summary_text.includes("0-1歳"), "INFANT-PROFILE: summary should mention infant profile");
+assert(infantPayload.outputs.summary_text.includes("背景疾患の有無"), "INFANT-PROFILE: summary should include infant not-judged item");
+
+const childInput = mergeVisitMeta({
+  c1_last_bowel_movement: "昨日",
+  c2_stool_consistency: ["硬い", "とても大きい"],
+  c3_pain_problem: ["強く痛がる", "トイレに行くのを嫌がる"],
+  c4_withholding: ["よくある", "遊びや動画を優先してトイレを後回しにする"],
+  c5_soiling: "週1回以上ある",
+  c6_school_toilet: ["行きたいけれど我慢する", "先生に言いにくい"],
+  c7_urinary: ["夜尿がある"],
+  c8_abdominal_symptom: ["おなかが痛い"],
+  c9_lifestyle: ["水分が少ない", "朝の時間がなくトイレに行きにくい"],
+  c10_med_status: ["ときどき忘れる", "飲みにくくて困る"],
+  c10_med_note: "学校の日は飲みにくい",
+  c11_background: ["発達について相談中"],
+  c11_background_note: "相談中",
+  c12_concerns: ["学校や園で困っている", "保護者が薬を減らすことを不安に思っている"],
+}, { age_profile: "child", patient_id: "00998", visit_token: "ch1" });
+assert(visibleFieldIds(childInput).includes("c6_school_toilet"), "CHILD-PROFILE: child school field should be visible");
+assert(!visibleFieldIds(childInput).includes("q5_withholding"), "CHILD-PROFILE: toddler withholding field should not be visible");
+const childPayload = generateSheetsVisitPayload(childInput);
+assert.strictEqual(childPayload.age_profile, "child", "CHILD-PROFILE: age profile mismatch");
+assert.strictEqual(childPayload.questionnaire_version, "child-prototype-v1", "CHILD-PROFILE: questionnaire version mismatch");
+assert(Object.prototype.hasOwnProperty.call(childPayload.questionnaire, "c6_school_toilet"), "CHILD-PROFILE: questionnaire should contain child school field");
+assert(childPayload.outputs.summary_text.includes("4歳以降"), "CHILD-PROFILE: summary should mention child profile");
+assert(childPayload.outputs.summary_text.includes("園・学校"), "CHILD-PROFILE: summary should include school-related context");
+
 console.log(
-  `${cases.length} MVP questionnaire cases, ${urgencyCases.length} urgency cases, ${medicationCases.length} medication cases, ${medicationBranchCases.length} medication branch cases, ${medicationMultiSelectCases.length} medication multi-select cases, ${recurrenceCases.length} recurrence cases, ${formerAlertCases.length} former alert-now-watch cases, ${watchCases.length} watch cases, ${stableCases.length} stable cases, ${boundaryCases.length} boundary cases, ${diaryCases.length} diary cases, ${facilityShareCases.length} facility share cases, ${patientMemoCases.length} patient memo cases, and ${visitMetaCases.length} visit meta cases plus 1 sheets payload case and 1 short QR case passed`
+  `${cases.length} MVP questionnaire cases, ${urgencyCases.length} urgency cases, ${medicationCases.length} medication cases, ${medicationBranchCases.length} medication branch cases, ${medicationMultiSelectCases.length} medication multi-select cases, ${recurrenceCases.length} recurrence cases, ${formerAlertCases.length} former alert-now-watch cases, ${watchCases.length} watch cases, ${stableCases.length} stable cases, ${boundaryCases.length} boundary cases, ${diaryCases.length} diary cases, ${facilityShareCases.length} facility share cases, ${patientMemoCases.length} patient memo cases, and ${visitMetaCases.length} visit meta cases plus 1 sheets payload case, 1 short QR case, and 2 age profile cases passed`
 );

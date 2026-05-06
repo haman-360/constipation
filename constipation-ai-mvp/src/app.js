@@ -15,6 +15,9 @@ const {
   generateSheetsVisitPayload,
   generateShortQrPayload,
   branchMessage,
+  normalizeAgeProfile,
+  questionnaireVersionForProfile,
+  profileBasicIds,
 } = window.ConstipationMvp;
 
 const DEFAULT_SUBMIT_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
@@ -24,20 +27,59 @@ const isStaffMode = STAFF_MODES.has(urlParams.get("mode")) || urlParams.get("sta
 const submitUrlFromParam = urlParams.get("submit_url") || urlParams.get("submitUrl") || "";
 if (submitUrlFromParam) localStorage.setItem("constipation_submit_url", submitUrlFromParam);
 const submitUrl = submitUrlFromParam || localStorage.getItem("constipation_submit_url") || DEFAULT_SUBMIT_URL;
+const ageProfileFromUrl = urlParams.get("age_profile") || urlParams.get("profile");
 const visitMetaFromUrl = normalizeVisitMeta({
   patient_id: urlParams.get("patient_id") || urlParams.get("pid"),
   visit_id: urlParams.get("visit_id") || urlParams.get("vid"),
   visit_token: urlParams.get("visit_token") || urlParams.get("token"),
+  age_profile: ageProfileFromUrl,
 });
+let activeAgeProfile = normalizeAgeProfile(visitMetaFromUrl.age_profile);
+let activeQuestionnaireVersion = questionnaireVersionForProfile(activeAgeProfile);
+let profileLookupStatus = ageProfileFromUrl ? "url" : "pending";
 
 const state = {
   started: false,
   index: 0,
-  answers: {},
+  answers: {
+    age_profile: activeAgeProfile,
+    questionnaire_version: activeQuestionnaireVersion,
+  },
   diary: {},
   submitted: false,
   dashboardMode: "full",
 };
+
+function setActiveAgeProfile(profile, source) {
+  activeAgeProfile = normalizeAgeProfile(profile);
+  activeQuestionnaireVersion = questionnaireVersionForProfile(activeAgeProfile);
+  profileLookupStatus = source || profileLookupStatus;
+  state.answers.age_profile = activeAgeProfile;
+  state.answers.questionnaire_version = activeQuestionnaireVersion;
+}
+
+async function loadAgeProfileFromWebApp() {
+  if (ageProfileFromUrl) return;
+  if (!submitUrl || !visitMetaFromUrl.patient_id) {
+    profileLookupStatus = "fallback";
+    return;
+  }
+  try {
+    const url = new URL(submitUrl);
+    url.searchParams.set("action", "patientProfileData");
+    url.searchParams.set("patient_id", visitMetaFromUrl.patient_id);
+    const response = await fetch(url.toString(), { method: "GET", mode: "cors" });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    if (result.age_profile && result.age_profile !== "unknown") {
+      setActiveAgeProfile(result.age_profile, "patientProfile");
+    } else {
+      profileLookupStatus = "fallback";
+    }
+  } catch (error) {
+    profileLookupStatus = "fallback";
+  }
+}
 
 const els = {
   screen: document.getElementById("screen"),
@@ -209,12 +251,22 @@ function renderIntro() {
   els.progress.hidden = true;
   els.nav.hidden = true;
   setDoctorPanelVisible(false);
+  const profileNotes = {
+    infant: "0-1歳向けの確認項目で進めます。",
+    toddler: "2-3歳向けの確認項目で進めます。",
+    child: "4歳以降向けの確認項目で進めます。",
+    unknown: "年齢情報を確認できなかったため、2-3歳向けの確認項目で進めます。",
+  };
+  const lookupNote = profileLookupStatus === "fallback"
+    ? "年齢情報を確認できませんでした。このまま問診を続けられます。診察時に年齢を確認します。"
+    : profileNotes[activeAgeProfile] || profileNotes.toddler;
   els.screen.innerHTML = `
     <div class="intro">
       <h1>うんちの様子を教えてください</h1>
       <p>診察の前に、最近のうんちの様子を確認します。<br>
       わかる範囲で、近いものを選んでください。<br>
       薬の量をこの画面で決めることはありません。</p>
+      <p class="intro-save-note">${escapeHtml(lookupNote)}</p>
       <p class="intro-save-note">最後に院内保存の完了表示が出るまで、この画面を閉じずにお待ちください。入力内容は最後にメモとしてコピーできます。</p>
       <button id="startButton" class="button" type="button">はじめる</button>
     </div>
@@ -229,15 +281,16 @@ function renderIntro() {
 function updateProgress(flow) {
   const fieldId = currentFieldId();
   const field = FIELDS[fieldId];
-  const basicPosition = BASIC_IDS.indexOf(fieldId);
+  const basicIds = profileBasicIds(activeAgeProfile);
+  const basicPosition = basicIds.indexOf(fieldId);
   const isBasic = basicPosition !== -1;
-  const additionalIds = flow.filter((id) => !BASIC_IDS.includes(id) && id !== "q6_med_adherence_flags");
+  const additionalIds = flow.filter((id) => !basicIds.includes(id) && id !== "q6_med_adherence_flags");
   const additionalPosition = additionalIds.indexOf(fieldId);
 
   if (isBasic) {
     els.progressLabel.textContent = "基本確認";
-    els.progressCount.textContent = `${basicPosition + 1} / ${BASIC_IDS.length}`;
-    els.progressBar.style.width = `${((basicPosition + 1) / BASIC_IDS.length) * 100}%`;
+    els.progressCount.textContent = `${basicPosition + 1} / ${basicIds.length}`;
+    els.progressBar.style.width = `${((basicPosition + 1) / basicIds.length) * 100}%`;
     return;
   }
 
@@ -379,6 +432,8 @@ function renderFinish() {
 function buildPayload() {
   return mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(state.answers), normalizeDiaryAnswers(state.diary)), {
     ...visitMetaFromUrl,
+    age_profile: activeAgeProfile,
+    questionnaire_version: activeQuestionnaireVersion,
     submitted_at: new Date().toISOString(),
   });
 }
@@ -440,10 +495,13 @@ function renderSubmitted() {
   document.getElementById("copyShortQrButton").addEventListener("click", async (event) => {
     await copyText(event.currentTarget, shortQrPayload, "コードコピー");
   });
-  document.getElementById("restartButton").addEventListener("click", () => {
+document.getElementById("restartButton").addEventListener("click", () => {
     state.started = false;
     state.index = 0;
-    state.answers = {};
+    state.answers = {
+      age_profile: activeAgeProfile,
+      questionnaire_version: activeQuestionnaireVersion,
+    };
     state.diary = {};
     state.submitted = false;
     state.dashboardMode = "full";
@@ -619,4 +677,9 @@ els.printPdfButton.addEventListener("click", () => {
   window.print();
 });
 
-render();
+async function boot() {
+  await loadAgeProfileFromWebApp();
+  render();
+}
+
+boot();

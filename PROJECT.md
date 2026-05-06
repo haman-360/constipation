@@ -265,9 +265,10 @@ MVP → Google Sheets連携の動作確認済み段階
 - `patients.birth_date` に生年月日を入力しておくと、便秘履歴とChatGPT貼り付け用テキストでは直近受診日を基準に年齢を自動計算する。
 - 患者画面では年齢を入力させない。初診後に医師が `patients.birth_date` を1回入力し、再診時は患者IDと受診日から年齢を算出する。
 - `patientProfile` で、医師側から `patients.birth_date` と台帳メモを登録できる。
-- 初診時のみ受付または医師側で `patients.birth_date` を登録し、再診時は患者IDと受診日から年齢を自動計算する。年齢プロファイルに応じた質問セット自動切り替えは次段階で実装する。
+- 初診時のみ受付または医師側で `patients.birth_date` を登録し、再診時は患者IDと受診日から年齢を自動計算する。
 - 医師側履歴、患者台帳、ChatGPT貼り付け用テキストでは、`patients.birth_date` と直近受診日から `infant` / `toddler` / `child` / `unknown` の年齢プロファイルを表示する。
-- `visits` には、受診時点の `age_profile`、`age_text_at_visit`、実際に使った `questionnaire_version` を保存する。現時点の患者問診は `toddler-mvp-v1` 固定。
+- 患者問診ページは、URLの患者IDを使ってWeb Appへ患者台帳を照会し、`infant` / `toddler` / `child` の質問セットを切り替える。照会失敗、年齢未登録、年齢不明時は `toddler-mvp-v1` で続行する。
+- `visits` には、受診時点の `age_profile`、`age_text_at_visit`、実際に使った `questionnaire_version` を保存する。
 - 生年月日はGitHub PagesのURL、QRコード、患者向けメモ、ChatGPT貼り付け用テキストには直接含めない。ChatGPTには年齢表示のみを渡す。
 - QR読み込み直後の患者画面に年齢を自動表示するには、問診開始前にWeb Appへ患者台帳を照会する必要があるため、現MVPでは搭載しない。年齢は医師側履歴とChatGPT貼り付け用テキストで確認する。
 - Sheets上で患者IDが `1234` のように見えていても、履歴取得時は `01234` と同じ5桁IDとして扱う。`setupSheets()` または `formatExistingSheets()` 実行でID列を文字列形式に整える。

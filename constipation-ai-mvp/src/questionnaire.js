@@ -6,8 +6,15 @@
   }
 })(typeof self !== "undefined" ? self : this, function () {
   const UNKNOWN = "わからない";
+  const AGE_PROFILES = ["infant", "toddler", "child", "unknown"];
+  const QUESTIONNAIRE_VERSIONS = {
+    infant: "infant-prototype-v1",
+    toddler: "toddler-mvp-v1",
+    child: "child-prototype-v1",
+    unknown: "toddler-mvp-v1",
+  };
 
-  const FIELDS = {
+  const TODDLER_FIELDS = {
     q1_last_bowel_movement: {
       label: "最後にうんちが出たのはいつですか？",
       summaryLabel: "最終排便",
@@ -139,6 +146,219 @@
     },
   };
 
+  const INFANT_FIELDS = {
+    i1_last_bowel_movement: {
+      label: "最後にうんちが出たのはいつですか？",
+      summaryLabel: "最終排便",
+      help: "だいたいで大丈夫です。",
+      type: "single",
+      required: true,
+      options: ["今日", "昨日", "2-3日前", "4日以上前", UNKNOWN],
+      group: "basic",
+    },
+    i2_stool_consistency: {
+      label: "うんちの様子はどれに近いですか？",
+      summaryLabel: "便性状",
+      type: "single",
+      required: true,
+      options: ["やわらかい", "普通", "硬い", "コロコロ", "水っぽい", "細い便が続く", UNKNOWN],
+      group: "basic",
+    },
+    i3_stool_behavior: {
+      label: "うんちのときの様子を教えてください。",
+      summaryLabel: "排便時の様子",
+      type: "multi",
+      required: true,
+      options: ["普段どおり", "いきむ", "泣く、痛がる", "顔を赤くして苦しそう", "出そうで出ない", "血がつくことがある"],
+      group: "basic",
+    },
+    i4_onset: {
+      label: "便秘はいつごろから気になりますか？",
+      summaryLabel: "気になる時期",
+      type: "single",
+      required: true,
+      options: ["生まれてすぐから", "生後数週間以内から", "ミルクや母乳の変化後から", "離乳食を始めたころから", "最近になってから", UNKNOWN],
+      group: "basic",
+    },
+    i5_birth_check: {
+      label: "出生時や1か月健診で異常を指摘されたことはありますか？",
+      summaryLabel: "出生時・1か月健診",
+      type: "single",
+      required: true,
+      options: ["ない", "ある", UNKNOWN],
+      group: "basic",
+    },
+    i5_birth_check_note: {
+      label: "差し支えなければ、指摘された内容を入力してください。",
+      type: "text",
+      required: false,
+      maxLength: 120,
+      group: "basic",
+    },
+    i6_feeding: {
+      label: "ミルク・母乳・食事の様子を教えてください。",
+      summaryLabel: "哺乳・食事",
+      type: "multi",
+      required: true,
+      options: ["よく飲む、よく食べる", "飲む量、食べる量が少ない", "最近飲む量、食べる量が減った", "離乳食を始めた、または内容が変わった", "吐くことが増えた"],
+      group: "condition",
+    },
+    i7_milk_dairy: {
+      label: "ミルク、母乳、牛乳・乳製品との関係で気になることはありますか？",
+      summaryLabel: "ミルク・乳製品との関係",
+      type: "multi",
+      required: true,
+      options: ["特に気にならない", "ミルクを変えてから便が硬くなった気がする", "牛乳・乳製品をとると便やおなかの調子が変わる気がする", "母乳中で、母が牛乳・乳製品を多くとると便やおなかの調子が変わる気がする", "湿疹、血便、吐き戻しなども気になる", UNKNOWN],
+      group: "condition",
+    },
+    i8_abdominal_condition: {
+      label: "おなかの様子で気になることはありますか？",
+      summaryLabel: "おなか・全身状態",
+      type: "multi",
+      required: true,
+      options: ["特に気にならない", "張っているように見える", "触ると嫌がる", "吐くことがある", "機嫌が悪い時間が増えた", "発熱がある"],
+      group: "condition",
+    },
+    i9_growth: {
+      label: "体重や成長について気になることはありますか？",
+      summaryLabel: "体重・成長",
+      type: "single",
+      required: true,
+      options: ["特に気にならない", "体重の増えが悪いと言われた", "最近体重が増えにくい気がする", "健診で相談するように言われた", UNKNOWN],
+      group: "condition",
+    },
+    i10_constipation_support: {
+      label: "便秘に対して使っているものはありますか？",
+      summaryLabel: "薬・処置",
+      type: "multi",
+      required: true,
+      options: ["なし", "医師から処方された薬", "市販薬", "浣腸", "綿棒刺激", "その他"],
+      group: "medicine",
+    },
+    i10_support_note: {
+      label: "使う頻度や使った後の様子を入力してください。",
+      type: "text",
+      required: false,
+      maxLength: 160,
+      group: "medicine",
+    },
+  };
+
+  const CHILD_FIELDS = {
+    c1_last_bowel_movement: {
+      label: "最後にうんちが出たのはいつですか？",
+      summaryLabel: "最終排便",
+      type: "single",
+      required: true,
+      options: ["今日", "昨日", "2-3日前", "4日以上前", UNKNOWN],
+      group: "basic",
+    },
+    c2_stool_consistency: {
+      label: "うんちの様子はどれに近いですか？",
+      summaryLabel: "便性状",
+      type: "multi",
+      required: true,
+      options: ["やわらかい", "普通", "硬い", "コロコロ", "とても大きい", "トイレが詰まりそうなくらい大きい", "水っぽい、または泥のよう", UNKNOWN],
+      group: "basic",
+    },
+    c3_pain_problem: {
+      label: "うんちのときに痛みや困りごとはありますか？",
+      summaryLabel: "排便時痛・困りごと",
+      type: "multi",
+      required: true,
+      options: ["痛がらない", "少し痛がる", "強く痛がる", "血がつくことがある", "出そうで出ない", "トイレに行くのを嫌がる", UNKNOWN],
+      group: "basic",
+    },
+    c4_withholding: {
+      label: "うんちを我慢する様子はありますか？",
+      summaryLabel: "がまん・排便回避",
+      type: "multi",
+      required: true,
+      options: ["ない", "ときどきある", "よくある", "足を閉じる、体を固くする、隠れることがある", "遊びや動画を優先してトイレを後回しにする", UNKNOWN],
+      group: "basic",
+    },
+    c5_soiling: {
+      label: "下着やパンツに便がつくことはありますか？",
+      summaryLabel: "便失禁・下着汚れ",
+      type: "single",
+      required: true,
+      options: ["ない", "ときどきある", "週1回以上ある", "ほぼ毎日ある", "本人が気づいていないことがある", UNKNOWN],
+      group: "basic",
+    },
+    c6_school_toilet: {
+      label: "園・学校でうんちに行けますか？",
+      summaryLabel: "園・学校での排便",
+      type: "multi",
+      required: true,
+      options: ["行ける", "ほとんど行かない", "行きたいけれど我慢する", "トイレが嫌で行けない", "恥ずかしくて行けない", "先生に言いにくい", UNKNOWN],
+      group: "school",
+    },
+    c7_urinary: {
+      label: "おしっこ、夜尿、昼間尿失禁で気になることはありますか？",
+      summaryLabel: "排尿・夜尿",
+      type: "multi",
+      required: true,
+      options: ["特にない", "夜尿がある", "昼間に尿もれがある（昼間尿失禁）", "トイレが近い", "尿を我慢することが多い", UNKNOWN],
+      group: "condition",
+    },
+    c8_abdominal_symptom: {
+      label: "おなかの症状はありますか？",
+      summaryLabel: "腹部症状",
+      type: "multi",
+      required: true,
+      options: ["特にない", "おなかが痛い", "食欲が落ちる", "吐くことがある", "おなかが張る", "うんちが出ると楽になる", UNKNOWN],
+      group: "condition",
+    },
+    c9_lifestyle: {
+      label: "食事・水分・生活リズムで気になることはありますか？",
+      summaryLabel: "食事・生活リズム",
+      type: "multi",
+      required: true,
+      options: ["特にない", "野菜が少ない", "果物が少ない", "水分が少ない", "お菓子が多い", "朝の時間がなくトイレに行きにくい", "運動が少ない", "生活リズムが不規則"],
+      group: "lifestyle",
+    },
+    c10_med_status: {
+      label: "便秘薬の飲み方について教えてください。",
+      summaryLabel: "便秘薬",
+      type: "multi",
+      required: true,
+      options: ["先生に言われた量で飲んでいる", "ときどき忘れる", "少なめに飲んでいる", "多めに飲んでいる", "飲みにくくて困る", "最近やめた", "便秘薬は使っていない"],
+      group: "medicine",
+    },
+    c10_med_note: {
+      label: "飲みにくい理由や学校・外出の日の困りごとがあれば入力してください。",
+      type: "text",
+      required: false,
+      maxLength: 160,
+      group: "medicine",
+    },
+    c11_background: {
+      label: "発達相談、通院中の病気、他院の薬について教えてください。",
+      summaryLabel: "背景情報",
+      type: "multi",
+      required: true,
+      options: ["特にない", "発達について相談中", "他院に通院中の病気がある", "他院で長く飲んでいる薬がある", "遺伝性疾患などを指摘されたことがある", "答えたくない、または今はわからない"],
+      group: "background",
+    },
+    c11_background_note: {
+      label: "差し支えなければ、通院中の病気や薬の名前を入力してください。",
+      type: "text",
+      required: false,
+      maxLength: 160,
+      group: "background",
+    },
+    c12_concerns: {
+      label: "本人と保護者の困りごと、薬への不安を教えてください。",
+      summaryLabel: "困りごと・不安",
+      type: "multi",
+      required: true,
+      options: ["本人はあまり困っていない", "本人が痛みを嫌がっている", "本人がトイレを嫌がっている", "保護者が薬を続けることを不安に思っている", "保護者が薬を減らすことを不安に思っている", "便秘になるのが不安で薬をやめられない", "頓用で薬を使っているが、続け方に迷っている", "学校や園で困っている", "家族内で対応に迷っている"],
+      group: "concern",
+    },
+  };
+
+  const FIELDS = { ...TODDLER_FIELDS, ...INFANT_FIELDS, ...CHILD_FIELDS };
+
   const BASIC_IDS = [
     "q1_last_bowel_movement",
     "q2_bowel_frequency",
@@ -146,6 +366,38 @@
     "q4_pain",
     "q5_withholding",
     "q6_med_status",
+  ];
+
+  const INFANT_BASIC_IDS = [
+    "i1_last_bowel_movement",
+    "i2_stool_consistency",
+    "i3_stool_behavior",
+    "i4_onset",
+    "i5_birth_check",
+    "i5_birth_check_note",
+    "i6_feeding",
+    "i7_milk_dairy",
+    "i8_abdominal_condition",
+    "i9_growth",
+    "i10_constipation_support",
+    "i10_support_note",
+  ];
+
+  const CHILD_BASIC_IDS = [
+    "c1_last_bowel_movement",
+    "c2_stool_consistency",
+    "c3_pain_problem",
+    "c4_withholding",
+    "c5_soiling",
+    "c6_school_toilet",
+    "c7_urinary",
+    "c8_abdominal_symptom",
+    "c9_lifestyle",
+    "c10_med_status",
+    "c10_med_note",
+    "c11_background",
+    "c11_background_note",
+    "c12_concerns",
   ];
 
   const ADDITIONAL_ORDER = [
@@ -169,9 +421,10 @@
     "diary_note",
   ];
 
-  const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at", "age_years", "age_months"];
+  const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at", "age_years", "age_months", "age_profile", "questionnaire_version"];
 
-  const QUESTIONNAIRE_FIELD_IDS = [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER];
+  const TODDLER_QUESTIONNAIRE_FIELD_IDS = [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER];
+  const QUESTIONNAIRE_FIELD_IDS = [...TODDLER_QUESTIONNAIRE_FIELD_IDS, ...INFANT_BASIC_IDS, ...CHILD_BASIC_IDS];
 
   const SHORT_QR_FIELD_ALIASES = {
     q1: "q1_last_bowel_movement",
@@ -194,6 +447,34 @@
 
   function asArray(value) {
     return Array.isArray(value) ? value : [];
+  }
+
+  function normalizeAgeProfile(value) {
+    const profile = String(value || "").trim();
+    return AGE_PROFILES.includes(profile) ? profile : "toddler";
+  }
+
+  function questionnaireVersionForProfile(profile) {
+    return QUESTIONNAIRE_VERSIONS[normalizeAgeProfile(profile)] || QUESTIONNAIRE_VERSIONS.toddler;
+  }
+
+  function profileBasicIds(profile) {
+    const normalized = normalizeAgeProfile(profile);
+    if (normalized === "infant") return INFANT_BASIC_IDS;
+    if (normalized === "child") return CHILD_BASIC_IDS;
+    return BASIC_IDS;
+  }
+
+  function profileQuestionnaireIds(profile) {
+    const normalized = normalizeAgeProfile(profile);
+    if (normalized === "infant") return INFANT_BASIC_IDS;
+    if (normalized === "child") return CHILD_BASIC_IDS;
+    return TODDLER_QUESTIONNAIRE_FIELD_IDS;
+  }
+
+  function isToddlerProfile(data) {
+    const profile = normalizeAgeProfile(data && data.age_profile);
+    return profile === "toddler" || profile === "unknown";
   }
 
   function isHardStool(value) {
@@ -230,6 +511,7 @@
   }
 
   function visibleFieldIds(data) {
+    if (!isToddlerProfile(data)) return profileBasicIds(data.age_profile);
     const f = flags(data);
     const ids = [...BASIC_IDS];
     if (shouldShowMedAdherence(data)) ids.push("q6_med_adherence_flags");
@@ -246,7 +528,10 @@
   function pruneHiddenAnswers(data) {
     const visible = new Set(visibleFieldIds(data));
     const next = {};
-    [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER].forEach((id) => {
+    VISIT_META_FIELD_IDS.forEach((id) => {
+      if (data && data[id] !== undefined) next[id] = data[id];
+    });
+    profileQuestionnaireIds(data && data.age_profile).forEach((id) => {
       if (visible.has(id) && data[id] !== undefined) next[id] = data[id];
     });
     return next;
@@ -284,12 +569,19 @@
       .slice(0, 40);
     const ageYears = normalizeAgeNumber_(input.age_years, 0, 18);
     const ageMonths = normalizeAgeNumber_(input.age_months, 0, 11);
+    const hasAgeProfile = input.age_profile !== undefined && input.age_profile !== null && input.age_profile !== "";
+    const ageProfile = hasAgeProfile ? normalizeAgeProfile(input.age_profile) : "";
+    const questionnaireVersion = String(input.questionnaire_version || (ageProfile ? questionnaireVersionForProfile(ageProfile) : ""))
+      .replace(/[^A-Za-z0-9_.-]/g, "")
+      .slice(0, 40);
 
     if (patientId.length === 5) meta.patient_id = patientId;
     if (visitToken) meta.visit_token = visitToken;
     if (submittedAt) meta.submitted_at = submittedAt;
     if (ageYears !== undefined) meta.age_years = ageYears;
     if (ageMonths !== undefined) meta.age_months = ageMonths;
+    if (ageProfile) meta.age_profile = ageProfile;
+    if (questionnaireVersion) meta.questionnaire_version = questionnaireVersion;
     if (visitId) {
       meta.visit_id = visitId;
     } else if (patientId.length === 5 && visitToken && submittedAt) {
@@ -334,6 +626,12 @@
         values.delete("まだわからない");
         values.delete(UNKNOWN);
       }
+    }
+    const exclusiveFirstOptions = new Set(["i7_milk_dairy", "i8_abdominal_condition", "i10_constipation_support", "c7_urinary", "c8_abdominal_symptom", "c9_lifestyle", "c10_med_status", "c11_background"]);
+    if (exclusiveFirstOptions.has(fieldId)) {
+      const first = FIELDS[fieldId] && FIELDS[fieldId].options && FIELDS[fieldId].options[0];
+      if (clicked === first && values.has(first)) values = new Set([first]);
+      if (clicked !== first && first && values.has(clicked)) values.delete(first);
     }
     return Array.from(values);
   }
@@ -396,6 +694,156 @@
       return item;
     });
     return withOther.length ? withOther.join("、") : "未確認";
+  }
+
+  function profileDisplayName(profile) {
+    const normalized = normalizeAgeProfile(profile);
+    if (normalized === "infant") return "0-1歳";
+    if (normalized === "child") return "4歳以降";
+    if (normalized === "unknown") return "年齢未確認";
+    return "2-3歳";
+  }
+
+  function hasAnyValue(data, ids, values) {
+    return ids.some((id) => asArray(data[id]).some((item) => values.includes(item)) || values.includes(data[id]));
+  }
+
+  function fieldLine(data, id) {
+    const field = FIELDS[id] || {};
+    return `- ${field.summaryLabel || field.label || id}: ${displayValue(data, id)}`;
+  }
+
+  function profileCheckItems(data) {
+    const profile = normalizeAgeProfile(data.age_profile);
+    if (profile === "infant") {
+      const items = [];
+      if (["生まれてすぐから", "生後数週間以内から"].includes(data.i4_onset)) items.push("出生直後または生後早期からの便秘として、出生時・1か月健診、哺乳、体重、腹部膨満、嘔吐を診察で確認。");
+      if (data.i5_birth_check === "ある" || data.i5_birth_check === UNKNOWN) items.push("出生時や1か月健診での指摘内容を診察で確認。");
+      if (hasAnyValue(data, ["i6_feeding", "i8_abdominal_condition", "i9_growth"], ["飲む量、食べる量が少ない", "最近飲む量、食べる量が減った", "吐くことが増えた", "張っているように見える", "触ると嫌がる", "吐くことがある", "機嫌が悪い時間が増えた", "発熱がある", "体重の増えが悪いと言われた", "最近体重が増えにくい気がする", "健診で相談するように言われた"])) {
+        items.push("哺乳・食事、嘔吐、腹部膨満、発熱、機嫌、体重増加を診察で確認。");
+      }
+      if (hasAnyValue(data, ["i7_milk_dairy"], ["ミルクを変えてから便が硬くなった気がする", "牛乳・乳製品をとると便やおなかの調子が変わる気がする", "母乳中で、母が牛乳・乳製品を多くとると便やおなかの調子が変わる気がする", "湿疹、血便、吐き戻しなども気になる"])) {
+        items.push("ミルク変更、牛乳・乳製品、湿疹、血便、吐き戻しとの関係を断定せず追加確認。");
+      }
+      if (hasAnyValue(data, ["i10_constipation_support"], ["市販薬", "浣腸", "綿棒刺激", "その他"])) items.push("薬・浣腸・綿棒刺激などの使用頻度と効果を確認し、自己判断を促さない。");
+      if (!items.length) items.push("0-1歳として、哺乳、体重増加、嘔吐、腹部膨満、発症時期を診察で確認。");
+      return items;
+    }
+    if (profile === "child") {
+      const items = [];
+      if (data.c5_soiling && data.c5_soiling !== "ない" && data.c5_soiling !== UNKNOWN) items.push("便失禁・下着汚れの頻度、本人の自覚、園・学校生活への影響を確認。");
+      if (hasAnyValue(data, ["c6_school_toilet"], ["ほとんど行かない", "行きたいけれど我慢する", "トイレが嫌で行けない", "恥ずかしくて行けない", "先生に言いにくい"])) items.push("園・学校での排便回避、トイレ環境、先生への相談可否を確認。");
+      if (hasAnyValue(data, ["c7_urinary"], ["夜尿がある", "昼間に尿もれがある（昼間尿失禁）", "トイレが近い", "尿を我慢することが多い"])) items.push("夜尿・昼間尿失禁・排尿習慣は便秘との関係を決めつけず背景情報として確認。");
+      if (hasAnyValue(data, ["c10_med_status", "c12_concerns"], ["ときどき忘れる", "少なめに飲んでいる", "多めに飲んでいる", "飲みにくくて困る", "最近やめた", "保護者が薬を続けることを不安に思っている", "保護者が薬を減らすことを不安に思っている", "便秘になるのが不安で薬をやめられない"])) items.push("服薬継続、自己調整、中止、不安を分けて診察で確認。");
+      if (hasAnyValue(data, ["c11_background"], ["発達について相談中", "他院に通院中の病気がある", "他院で長く飲んでいる薬がある", "遺伝性疾患などを指摘されたことがある"])) items.push("発達相談、他院通院、他院処方は便秘との関係を断定せず背景情報として確認。");
+      if (!items.length) items.push("4歳以降として、園・学校での排便、便失禁、生活リズム、本人と保護者の困りごとを確認。");
+      return items;
+    }
+    return aiFollowUpItems(data);
+  }
+
+  function profileHeadline(data) {
+    const profile = normalizeAgeProfile(data.age_profile);
+    const items = profileCheckItems(data);
+    if (profile === "infant") return `0-1歳向け問診です。${items[0] || "哺乳、体重、嘔吐、腹部膨満を診察で確認します。"}`;
+    if (profile === "child") return `4歳以降向け問診です。${items[0] || "園・学校生活、便失禁、生活リズムを診察で確認します。"}`;
+    return primaryConcern(data);
+  }
+
+  function profileReviewRows(data, ids) {
+    return ids.map((id) => ({ label: (FIELDS[id] && (FIELDS[id].summaryLabel || FIELDS[id].label)) || id, value: displayValue(data, id) }));
+  }
+
+  function generateProfileReview(data) {
+    const profile = normalizeAgeProfile(data.age_profile);
+    if (profile === "infant") {
+      return {
+        urgency: { level: "watch", label: "診察で確認", message: "0-1歳として診察時に確認したい情報があります。" },
+        headline: profileHeadline(data),
+        stool: profileReviewRows(data, ["i1_last_bowel_movement", "i2_stool_consistency", "i3_stool_behavior", "i4_onset", "i5_birth_check"]),
+        safety: profileReviewRows(data, ["i6_feeding", "i8_abdominal_condition", "i9_growth"]),
+        stoolConcerns: profileReviewRows(data, ["i7_milk_dairy"]),
+        medication: profileReviewRows(data, ["i10_constipation_support", "i10_support_note"]),
+        diary: diaryRows(data),
+        weeklySummary: weeklySummary(data),
+        checkItems: profileCheckItems(data).slice(0, 4),
+        notJudged: ["診断", "背景疾患の有無", "処方量変更", "処置頻度の指示", "専門紹介の要否"],
+        raw: data,
+      };
+    }
+    return {
+      urgency: { level: "watch", label: "診察で確認", message: "4歳以降として診察時に確認したい情報があります。" },
+      headline: profileHeadline(data),
+      stool: profileReviewRows(data, ["c1_last_bowel_movement", "c2_stool_consistency", "c3_pain_problem", "c4_withholding", "c5_soiling"]),
+      safety: profileReviewRows(data, ["c6_school_toilet", "c7_urinary", "c8_abdominal_symptom"]),
+      stoolConcerns: profileReviewRows(data, ["c9_lifestyle", "c11_background", "c12_concerns"]),
+      medication: profileReviewRows(data, ["c10_med_status", "c10_med_note"]),
+      diary: diaryRows(data),
+      weeklySummary: weeklySummary(data),
+      checkItems: profileCheckItems(data).slice(0, 4),
+      notJudged: ["診断", "便塞栓の有無", "処方量変更", "治療中止可否", "専門紹介の要否"],
+      raw: data,
+    };
+  }
+
+  function generateProfileSummary(input) {
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    const profile = normalizeAgeProfile(data.age_profile);
+    const review = generateProfileReview(data);
+    const ids = profileQuestionnaireIds(profile);
+    const answers = ids
+      .filter((id) => data[id] !== undefined)
+      .map((id) => fieldLine(data, id))
+      .join("\n") || "- 未確認";
+    return `【診察前 便秘ミニサマリー】
+
+年齢: ${ageText(data)}
+年齢プロファイル: ${profileDisplayName(profile)}
+質問セット: ${questionnaireVersionForProfile(profile)}
+
+問診回答:
+${answers}
+
+直近日誌:
+${diarySummaryText(data)}
+
+週次サマリー:
+${weeklySummaryText(data)}
+
+医師が確認する候補:
+${review.checkItems.map((item) => `- ${item}`).join("\n")}
+
+AIが判断していないこと:
+- ${review.notJudged.join("\n- ")}`;
+  }
+
+  function generateProfilePatientMemo(input) {
+    const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    const profile = normalizeAgeProfile(data.age_profile);
+    const review = generateProfileReview(data);
+    const diaryText = weeklySummary(data);
+    const diarySection = diaryText.length
+      ? `
+最近の記録:
+${diaryText.map((item) => `- ${item}`).join("\n")}
+`
+      : "";
+    const firstRows = profileQuestionnaireIds(profile)
+      .filter((id) => data[id] !== undefined)
+      .slice(0, 6)
+      .map((id) => fieldLine(data, id))
+      .join("\n");
+    return `【便秘メモ】
+
+今日のうんちの様子:
+${firstRows || "- 未確認"}
+${diarySection}
+次に相談すること:
+${review.checkItems.slice(0, 3).map((item) => `- ${item}`).join("\n")}
+
+大事なこと:
+- このメモでは診断や薬の量を決めません。
+- 薬を増やす、減らす、やめる、再開する判断は医師と相談します。`;
   }
 
   function staffShareConcerns(data) {
@@ -608,6 +1056,7 @@
 
   function generatePhysicianReview(input) {
     const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    if (!isToddlerProfile(data)) return generateProfileReview(data);
     const followUps = aiFollowUpItems(data);
     return {
       urgency: reviewUrgency(data),
@@ -644,6 +1093,7 @@
 
   function generateSummary(input) {
     const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    if (!isToddlerProfile(data)) return generateProfileSummary(data);
     const followUps = aiFollowUpItems(data).map((item) => `- ${item}`).join("\n");
     return `【診察前 便秘ミニサマリー】
 
@@ -687,6 +1137,25 @@ AIが判断していないこと:
 
   function generateFacilityShare(input) {
     const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    if (!isToddlerProfile(data)) {
+      const review = generatePhysicianReview(data);
+      return `【院内共有用 便秘問診】
+
+確認区分: ${review.urgency.label}
+概要: ${review.headline}
+年齢: ${ageText(data)}
+年齢プロファイル: ${profileDisplayName(data.age_profile)}
+質問セット: ${questionnaireVersionForProfile(data.age_profile)}
+
+診察で見るポイント:
+${review.checkItems.map((item) => `- ${item}`).join("\n")}
+
+AIが判断していないこと:
+- ${review.notJudged.join("\n- ")}
+
+送信JSON:
+${JSON.stringify(data, null, 2)}`;
+    }
     const review = generatePhysicianReview(data);
     return `【院内共有用 便秘問診】
 
@@ -706,6 +1175,7 @@ ${JSON.stringify(data, null, 2)}`;
 
   function generatePatientMemo(input) {
     const data = mergeVisitMeta(mergeDiaryAnswers(pruneHiddenAnswers(input), input), input);
+    if (!isToddlerProfile(data)) return generateProfilePatientMemo(data);
     const diaryText = weeklySummary(data);
     const diarySection = diaryText.length
       ? `
@@ -750,7 +1220,9 @@ ${diarySection}
       submitted_at: data.submitted_at || "",
       age_years: data.age_years === undefined ? "" : data.age_years,
       age_months: data.age_months === undefined ? "" : data.age_months,
-      questionnaire: pickDefined(data, QUESTIONNAIRE_FIELD_IDS),
+      age_profile: normalizeAgeProfile(data.age_profile),
+      questionnaire_version: data.questionnaire_version || questionnaireVersionForProfile(data.age_profile),
+      questionnaire: pickDefined(data, profileQuestionnaireIds(data.age_profile)),
       diary: pickDefined(data, DIARY_FIELD_IDS),
       outputs: {
         urgency_level: review.urgency.level,
@@ -839,6 +1311,7 @@ ${diarySection}
   }
 
   function branchMessage(fieldId, data) {
+    if (!isToddlerProfile(data)) return "";
     const f = flags(data);
     if (["q9_abdominal_symptom", "q10_vomiting", "q11_appetite_mood"].includes(fieldId)) {
       return f.fourDays
@@ -858,8 +1331,15 @@ ${diarySection}
   }
 
   return {
+    AGE_PROFILES,
+    QUESTIONNAIRE_VERSIONS,
+    TODDLER_FIELDS,
+    INFANT_FIELDS,
+    CHILD_FIELDS,
     FIELDS,
     BASIC_IDS,
+    INFANT_BASIC_IDS,
+    CHILD_BASIC_IDS,
     ADDITIONAL_ORDER,
     DIARY_FIELD_IDS,
     VISIT_META_FIELD_IDS,
@@ -867,6 +1347,10 @@ ${diarySection}
     SHORT_QR_FIELD_ALIASES,
     SHORT_QR_DIARY_IDS,
     flags,
+    normalizeAgeProfile,
+    questionnaireVersionForProfile,
+    profileBasicIds,
+    profileQuestionnaireIds,
     shouldShowMedAdherence,
     visibleFieldIds,
     pruneHiddenAnswers,

@@ -158,7 +158,11 @@
 - [x] 医師側の患者台帳UIで生年月日登録を追加
 - [x] 医師側履歴とChatGPT貼り付け用テキストに年齢プロファイル表示を追加
 - [x] `visits.age_profile` / `visits.age_text_at_visit` / `visits.questionnaire_version` の保存を追加
-- [ ] 患者台帳UIをApps Scriptデプロイ後にテスト患者で動作確認
+- [x] 患者台帳UIをApps Scriptデプロイ後にテスト患者で動作確認
+- [x] `infant` と `child` の患者向け質問セットを実装
+- [x] 患者問診ページでWeb App照会による年齢プロファイル取得と質問セット切り替えを実装
+- [x] 年齢プロファイル照会失敗時に `toddler` 質問セットで続行するフォールバックを実装
+- [ ] 年齢層別質問セットをApps Script再デプロイ後にテスト患者で動作確認
 - [ ] 追加の医療者レビュー後修正
 
 

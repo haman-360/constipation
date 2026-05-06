@@ -168,7 +168,7 @@ questionnaire-profile-child.js
 - 患者向けメモ項目
 - ChatGPT追加観点
 
-まずは現MVPの質問セットを `toddler` として固定する。0-1歳、4歳以降は文書レビュー後に追加する。
+初期実装では現MVPの質問セットを `toddler` として固定していた。現在は、`patients.birth_date` から取得できる年齢プロファイルに応じて、`infant` / `toddler` / `child` の質問セットを切り替える。通信失敗、birth_date未登録、年齢不明時は `toddler` で続行する。
 
 ## 切り替えロジック案
 
@@ -202,9 +202,9 @@ questionnaire-profile-child.js
 2. 医師側履歴とChatGPT貼り付け用テキストに `age_profile` 表示を追加する。完了。
 3. 医師側の患者台帳編集で `birth_date` を入力しやすくする。完了。
 4. `visits.age_profile`、`visits.age_text_at_visit`、`visits.questionnaire_version` の保存を追加する。完了。
-5. `infant` と `child` の質問セットを実装する。
-6. 患者問診ページで、Web App照会による質問セット切り替えを実装する。
-7. 通信失敗時に `toddler` で続行するフォールバックを確認する。
+5. `infant` と `child` の質問セットを実装する。完了。
+6. 患者問診ページで、Web App照会による質問セット切り替えを実装する。完了。
+7. 通信失敗時に `toddler` で続行するフォールバックを確認する。実装済み、実環境確認待ち。
 
 ## 実装前レビュー項目
 

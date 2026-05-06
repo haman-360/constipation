@@ -201,7 +201,7 @@ questionnaire-profile-child.js
 1. 現MVPの質問セットを `toddler` として整理する。
 2. 医師側履歴とChatGPT貼り付け用テキストに `age_profile` 表示を追加する。完了。
 3. 医師側の患者台帳編集で `birth_date` を入力しやすくする。完了。
-4. `visits.age_profile` と `visits.questionnaire_version` の保存を追加する。
+4. `visits.age_profile`、`visits.age_text_at_visit`、`visits.questionnaire_version` の保存を追加する。完了。
 5. `infant` と `child` の質問セットを実装する。
 6. 患者問診ページで、Web App照会による質問セット切り替えを実装する。
 7. 通信失敗時に `toddler` で続行するフォールバックを確認する。

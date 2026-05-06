@@ -108,6 +108,7 @@ http://localhost:8000/history-link.html
    - 生年月日は `patients.birth_date` に保存される。
    - 生年月日は患者向けURL、QR、ChatGPT貼り付け用テキストには直接含めない。
    - 便秘履歴とChatGPT貼り付け用テキストでは、直近受診日を基準にした年齢表示だけを使う。
+   - 問診送信後の `visits` には、受診時点の `age_profile`、`age_text_at_visit`、`questionnaire_version` が保存される。
 5. `医師用履歴表示を開く` で診察前に見やすい履歴画面を確認する。
    - 画面内の `ChatGPT診察前整理テキストをページ内で表示` から診察前整理モードを確認できる。
    - 画面内の `ChatGPT治療方針検討テキストをページ内で表示` から医師向け治療方針検討モードを確認できる。

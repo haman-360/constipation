@@ -33,6 +33,9 @@ const VISITS_HEADERS = [
   "patient_memo_text",
   "reviewed_by_doctor",
   "doctor_note",
+  "age_profile",
+  "age_text_at_visit",
+  "questionnaire_version",
 ];
 
 const PRESCRIPTIONS_HEADERS = [
@@ -89,6 +92,9 @@ const HISTORY_LABELS = {
   withholding_days: "がまんの日",
   soiling_days: "便もれ",
   med_taken_days: "内服できた日",
+  age_profile: "年齢プロファイル",
+  age_text_at_visit: "受診時年齢",
+  questionnaire_version: "質問セット",
 };
 
 const SHEET_DEFINITIONS = [
@@ -96,7 +102,7 @@ const SHEET_DEFINITIONS = [
   {
     name: SHEET_NAMES.visits,
     headers: VISITS_HEADERS,
-    widths: [170, 95, 95, 175, 175, 105, 120, 300, 260, 180, 420, 420, 360, 130, 260],
+    widths: [170, 95, 95, 175, 175, 105, 120, 300, 260, 180, 420, 420, 360, 130, 260, 120, 130, 170],
     hiddenHeaders: ["questionnaire_json", "diary_json"],
     plainTextHeaders: ["visit_id", "patient_id", "visit_token"],
   },
@@ -176,6 +182,10 @@ function submitVisit(payload) {
   const outputs = payload.outputs || {};
 
   const patientSaved = upsertPatient_(patientId, savedAt, payload.age_years, payload.age_months);
+  const patient = getPatient_(patientId);
+  const ageProfile = patientAgeProfile_(patient, submittedAt);
+  const ageTextAtVisit = patientAgeText_(patient, submittedAt);
+  const questionnaireVersion = "toddler-mvp-v1";
   sheet.appendRow([
     visitId,
     patientId,
@@ -192,6 +202,9 @@ function submitVisit(payload) {
     outputs.patient_memo_text || "",
     false,
     "",
+    ageProfile,
+    ageTextAtVisit,
+    questionnaireVersion,
   ]);
   const row = sheet.getLastRow();
   sheet.getRange(row, 1, 1, 3)
@@ -1220,6 +1233,7 @@ function formatVisitsForContext_(visits) {
     const diary = visit.diary || {};
     return [
       `${index + 1}. ${visit.submitted_at || visit.saved_at || "日付不明"} / ${visit.urgency_label || "区分不明"}`,
+      `   年齢: ${visit.age_text_at_visit || "未確認"}, 年齢プロファイル=${visit.age_profile || "未記録"}, 質問セット=${visit.questionnaire_version || "未記録"}`,
       `   概要: ${visit.headline || "未記録"}`,
       `   便: 最終排便=${questionnaire.q1_last_bowel_movement || "未確認"}, 頻度=${questionnaire.q2_bowel_frequency || "未確認"}, 硬さ=${questionnaire.q3_stool_consistency || "未確認"}, 痛み=${questionnaire.q4_pain || "未確認"}, がまん=${questionnaire.q5_withholding || "未確認"}`,
       `   薬: ${questionnaire.q6_med_status || "未確認"}`,
@@ -1237,6 +1251,9 @@ function formatVisitHtml_(visit) {
       <p class="headline">${escapeHtml_(visit.submitted_at || visit.saved_at || "日付不明")} / ${escapeHtml_(visit.urgency_label || "区分不明")}</p>
       <p>${escapeHtml_(visit.headline || "概要未記録")}</p>
       <div class="grid">
+        ${htmlItem_("受診時年齢", visit.age_text_at_visit)}
+        ${htmlItem_("年齢プロファイル", displayAgeProfile_(visit.age_profile))}
+        ${htmlItem_("質問セット", visit.questionnaire_version)}
         ${htmlItem_("最終排便", questionnaire.q1_last_bowel_movement)}
         ${htmlItem_("排便頻度", questionnaire.q2_bowel_frequency)}
         ${htmlItem_("便の硬さ", questionnaire.q3_stool_consistency)}
@@ -1266,6 +1283,11 @@ function formatSimpleRowsHtml_(rows, keys, labels) {
 
 function htmlItem_(label, value) {
   return `<div class="item"><span class="label">${escapeHtml_(label)}</span><strong>${escapeHtml_(cellText_(value))}</strong></div>`;
+}
+
+function displayAgeProfile_(profile) {
+  if (!profile) return "";
+  return `${profile}（${ageProfileLabel_(profile)}）`;
 }
 
 function escapeHtml_(value) {

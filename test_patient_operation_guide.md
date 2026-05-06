@@ -79,6 +79,7 @@
 - [ ] 保存後、Sheetsの `patients.birth_date` と `patients.note` に反映される
 - [ ] 便秘履歴画面に戻ると、保存した処方・トイレトレーニングが表示される
 - [ ] 便秘履歴画面とChatGPT貼り付け用テキストに、生年月日ではなく年齢表示だけが出る
+- [ ] `visits` に `age_profile`、`age_text_at_visit`、`questionnaire_version` が保存される
 
 ## 合格条件
 

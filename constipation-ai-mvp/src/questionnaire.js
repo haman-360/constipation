@@ -374,13 +374,11 @@
     "i3_stool_behavior",
     "i4_onset",
     "i5_birth_check",
-    "i5_birth_check_note",
     "i6_feeding",
     "i7_milk_dairy",
     "i8_abdominal_condition",
     "i9_growth",
     "i10_constipation_support",
-    "i10_support_note",
   ];
 
   const CHILD_BASIC_IDS = [
@@ -394,11 +392,12 @@
     "c8_abdominal_symptom",
     "c9_lifestyle",
     "c10_med_status",
-    "c10_med_note",
     "c11_background",
-    "c11_background_note",
     "c12_concerns",
   ];
+
+  const INFANT_CONDITIONAL_IDS = ["i5_birth_check_note", "i10_support_note"];
+  const CHILD_CONDITIONAL_IDS = ["c10_med_note", "c11_background_note"];
 
   const ADDITIONAL_ORDER = [
     "q9_abdominal_symptom",
@@ -424,7 +423,7 @@
   const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at", "age_years", "age_months", "age_profile", "questionnaire_version"];
 
   const TODDLER_QUESTIONNAIRE_FIELD_IDS = [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER];
-  const QUESTIONNAIRE_FIELD_IDS = [...TODDLER_QUESTIONNAIRE_FIELD_IDS, ...INFANT_BASIC_IDS, ...CHILD_BASIC_IDS];
+  const QUESTIONNAIRE_FIELD_IDS = [...TODDLER_QUESTIONNAIRE_FIELD_IDS, ...INFANT_BASIC_IDS, ...INFANT_CONDITIONAL_IDS, ...CHILD_BASIC_IDS, ...CHILD_CONDITIONAL_IDS];
 
   const SHORT_QR_FIELD_ALIASES = {
     q1: "q1_last_bowel_movement",
@@ -465,10 +464,27 @@
     return BASIC_IDS;
   }
 
+  function visibleInfantFieldIds(data) {
+    const ids = [...INFANT_BASIC_IDS];
+    if (data.i5_birth_check === "ある") ids.splice(ids.indexOf("i6_feeding"), 0, "i5_birth_check_note");
+    const support = asArray(data.i10_constipation_support);
+    if (support.some((item) => item !== "なし")) ids.push("i10_support_note");
+    return ids;
+  }
+
+  function visibleChildFieldIds(data) {
+    const ids = [...CHILD_BASIC_IDS];
+    const med = asArray(data.c10_med_status);
+    if (med.some((item) => item !== "便秘薬は使っていない")) ids.splice(ids.indexOf("c11_background"), 0, "c10_med_note");
+    const background = asArray(data.c11_background);
+    if (background.some((item) => item !== "特にない" && item !== "答えたくない、または今はわからない")) ids.splice(ids.indexOf("c12_concerns"), 0, "c11_background_note");
+    return ids;
+  }
+
   function profileQuestionnaireIds(profile) {
     const normalized = normalizeAgeProfile(profile);
-    if (normalized === "infant") return INFANT_BASIC_IDS;
-    if (normalized === "child") return CHILD_BASIC_IDS;
+    if (normalized === "infant") return [...INFANT_BASIC_IDS, ...INFANT_CONDITIONAL_IDS];
+    if (normalized === "child") return [...CHILD_BASIC_IDS, ...CHILD_CONDITIONAL_IDS];
     return TODDLER_QUESTIONNAIRE_FIELD_IDS;
   }
 
@@ -511,7 +527,12 @@
   }
 
   function visibleFieldIds(data) {
-    if (!isToddlerProfile(data)) return profileBasicIds(data.age_profile);
+    if (!isToddlerProfile(data)) {
+      const profile = normalizeAgeProfile(data && data.age_profile);
+      if (profile === "infant") return visibleInfantFieldIds(data || {});
+      if (profile === "child") return visibleChildFieldIds(data || {});
+      return profileBasicIds(profile);
+    }
     const f = flags(data);
     const ids = [...BASIC_IDS];
     if (shouldShowMedAdherence(data)) ids.push("q6_med_adherence_flags");

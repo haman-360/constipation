@@ -1365,6 +1365,8 @@ const infantInput = mergeVisitMeta({
   i10_support_note: "週数回",
 }, { age_profile: "infant", patient_id: "00999", visit_token: "inf1" });
 assert(visibleFieldIds(infantInput).includes("i4_onset"), "INFANT-PROFILE: infant fields should be visible");
+assert(visibleFieldIds(infantInput).includes("i5_birth_check_note"), "INFANT-PROFILE: birth check note should be visible when indicated");
+assert(visibleFieldIds(infantInput).includes("i10_support_note"), "INFANT-PROFILE: support note should be visible when support is used");
 assert(!visibleFieldIds(infantInput).includes("q6_med_status"), "INFANT-PROFILE: toddler medicine field should not be visible");
 const infantPayload = generateSheetsVisitPayload(infantInput);
 assert.strictEqual(infantPayload.age_profile, "infant", "INFANT-PROFILE: age profile mismatch");
@@ -1373,6 +1375,20 @@ assert(Object.prototype.hasOwnProperty.call(infantPayload.questionnaire, "i4_ons
 assert(!Object.prototype.hasOwnProperty.call(infantPayload.questionnaire, "q6_med_status"), "INFANT-PROFILE: questionnaire should not contain toddler field");
 assert(infantPayload.outputs.summary_text.includes("0-1歳"), "INFANT-PROFILE: summary should mention infant profile");
 assert(infantPayload.outputs.summary_text.includes("背景疾患の有無"), "INFANT-PROFILE: summary should include infant not-judged item");
+const infantNoFollowUp = mergeVisitMeta({
+  i1_last_bowel_movement: "今日",
+  i2_stool_consistency: "普通",
+  i3_stool_behavior: ["普段どおり"],
+  i4_onset: "最近になってから",
+  i5_birth_check: "ない",
+  i6_feeding: ["よく飲む、よく食べる"],
+  i7_milk_dairy: ["特に気にならない"],
+  i8_abdominal_condition: ["特に気にならない"],
+  i9_growth: "特に気にならない",
+  i10_constipation_support: ["なし"],
+}, { age_profile: "infant" });
+assert(!visibleFieldIds(infantNoFollowUp).includes("i5_birth_check_note"), "INFANT-PROFILE: birth check note should be hidden when no issue");
+assert(!visibleFieldIds(infantNoFollowUp).includes("i10_support_note"), "INFANT-PROFILE: support note should be hidden when no support");
 
 const childInput = mergeVisitMeta({
   c1_last_bowel_movement: "昨日",
@@ -1391,6 +1407,8 @@ const childInput = mergeVisitMeta({
   c12_concerns: ["学校や園で困っている", "保護者が薬を減らすことを不安に思っている"],
 }, { age_profile: "child", patient_id: "00998", visit_token: "ch1" });
 assert(visibleFieldIds(childInput).includes("c6_school_toilet"), "CHILD-PROFILE: child school field should be visible");
+assert(visibleFieldIds(childInput).includes("c10_med_note"), "CHILD-PROFILE: med note should be visible when medicine has issues");
+assert(visibleFieldIds(childInput).includes("c11_background_note"), "CHILD-PROFILE: background note should be visible when background exists");
 assert(!visibleFieldIds(childInput).includes("q5_withholding"), "CHILD-PROFILE: toddler withholding field should not be visible");
 const childPayload = generateSheetsVisitPayload(childInput);
 assert.strictEqual(childPayload.age_profile, "child", "CHILD-PROFILE: age profile mismatch");
@@ -1398,6 +1416,22 @@ assert.strictEqual(childPayload.questionnaire_version, "child-prototype-v1", "CH
 assert(Object.prototype.hasOwnProperty.call(childPayload.questionnaire, "c6_school_toilet"), "CHILD-PROFILE: questionnaire should contain child school field");
 assert(childPayload.outputs.summary_text.includes("4歳以降"), "CHILD-PROFILE: summary should mention child profile");
 assert(childPayload.outputs.summary_text.includes("園・学校"), "CHILD-PROFILE: summary should include school-related context");
+const childNoFollowUp = mergeVisitMeta({
+  c1_last_bowel_movement: "今日",
+  c2_stool_consistency: ["普通"],
+  c3_pain_problem: ["痛がらない"],
+  c4_withholding: ["ない"],
+  c5_soiling: "ない",
+  c6_school_toilet: ["行ける"],
+  c7_urinary: ["特にない"],
+  c8_abdominal_symptom: ["特にない"],
+  c9_lifestyle: ["特にない"],
+  c10_med_status: ["便秘薬は使っていない"],
+  c11_background: ["特にない"],
+  c12_concerns: ["本人はあまり困っていない"],
+}, { age_profile: "child" });
+assert(!visibleFieldIds(childNoFollowUp).includes("c10_med_note"), "CHILD-PROFILE: med note should be hidden when no medicine");
+assert(!visibleFieldIds(childNoFollowUp).includes("c11_background_note"), "CHILD-PROFILE: background note should be hidden when no background");
 
 console.log(
   `${cases.length} MVP questionnaire cases, ${urgencyCases.length} urgency cases, ${medicationCases.length} medication cases, ${medicationBranchCases.length} medication branch cases, ${medicationMultiSelectCases.length} medication multi-select cases, ${recurrenceCases.length} recurrence cases, ${formerAlertCases.length} former alert-now-watch cases, ${watchCases.length} watch cases, ${stableCases.length} stable cases, ${boundaryCases.length} boundary cases, ${diaryCases.length} diary cases, ${facilityShareCases.length} facility share cases, ${patientMemoCases.length} patient memo cases, and ${visitMetaCases.length} visit meta cases plus 1 sheets payload case, 1 short QR case, and 2 age profile cases passed`

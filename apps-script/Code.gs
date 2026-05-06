@@ -193,6 +193,10 @@ function submitVisit(payload) {
     false,
     "",
   ]);
+  const row = sheet.getLastRow();
+  sheet.getRange(row, 1, 1, 3)
+    .setNumberFormat("@")
+    .setValues([[visitId, patientId, payload.visit_token || ""]]);
   const diaryWeeklySaved = appendDiaryWeeklyIfPresent_(payload, patientId, savedAt);
 
   return {

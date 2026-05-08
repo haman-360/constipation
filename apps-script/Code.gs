@@ -1387,8 +1387,14 @@ function visitQuestionnaireItems_(visit) {
     ["便の硬さ", ["i2_stool_consistency", "q3_stool_consistency"]],
     ["排便時の様子", ["i3_stool_behavior", "q4_pain"]],
     ["発症時期", ["i4_onset"]],
+    ["出生時・1か月健診", ["i5_birth_check"]],
+    ["出生時・健診の補足", ["i5_birth_check_note"]],
     ["哺乳・食事", ["i6_feeding"]],
+    ["ミルク・乳製品との関係", ["i7_milk_dairy"]],
+    ["おなか・全身状態", ["i8_abdominal_condition"]],
+    ["体重・成長", ["i9_growth"]],
     ["便秘対応", ["i10_constipation_support", "q6_med_status"]],
+    ["便秘対応の補足", ["i10_support_note"]],
   ]);
   if (profile === "child") return visitQuestionnaireItemsForProfile_(visit, [
     ["最終排便", ["c1_last_bowel_movement", "q1_last_bowel_movement"]],
@@ -1397,7 +1403,14 @@ function visitQuestionnaireItems_(visit) {
     ["がまん・回避", ["c4_withholding", "q5_withholding"]],
     ["便失禁・下着汚れ", ["c5_soiling", "q8_soiling"]],
     ["園・学校トイレ", ["c6_school_toilet"]],
+    ["排尿・夜尿", ["c7_urinary"]],
+    ["腹部症状", ["c8_abdominal_symptom"]],
+    ["食事・生活リズム", ["c9_lifestyle"]],
     ["薬", ["c10_med_status", "q6_med_status"]],
+    ["薬の補足", ["c10_med_note"]],
+    ["背景情報", ["c11_background"]],
+    ["背景情報の補足", ["c11_background_note"]],
+    ["困りごと・不安", ["c12_concerns"]],
   ]);
   return visitQuestionnaireItemsForProfile_(visit, [
     ["最終排便", ["q1_last_bowel_movement"]],
@@ -1406,12 +1419,23 @@ function visitQuestionnaireItems_(visit) {
     ["痛み", ["q4_pain"]],
     ["がまん", ["q5_withholding"]],
     ["薬", ["q6_med_status"]],
+    ["薬の飲み忘れ・飲みにくさ", ["q6_med_adherence_flags"]],
+    ["腹部症状", ["q9_abdominal_symptom"]],
+    ["嘔吐", ["q10_vomiting"]],
+    ["食欲・機嫌", ["q11_appetite_mood"]],
+    ["血便・出血", ["q7_blood"]],
+    ["便もれ", ["q8_soiling"]],
+    ["薬が飲みにくい理由", ["q13_med_difficulty_reason"]],
+    ["薬が飲みにくい理由の補足", ["q13_med_difficulty_other"]],
+    ["薬を減らした後の変化", ["q14_change_after_less_med"]],
   ]);
 }
 
 function visitQuestionnaireItemsForProfile_(visit, definitions) {
   const questionnaire = visit.questionnaire || {};
-  return definitions.map(([label, keys]) => [label, firstQuestionnaireValue_(questionnaire, keys)]);
+  return definitions
+    .map(([label, keys]) => [label, firstQuestionnaireValue_(questionnaire, keys)])
+    .filter(([, value]) => value !== "" && value !== null && value !== undefined);
 }
 
 function firstQuestionnaireValue_(questionnaire, keys) {

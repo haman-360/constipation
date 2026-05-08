@@ -1,0 +1,7 @@
+patient_id	record_date	record_type	birth_date	age_memo	medicine_name	dose	instruction	training_status	diaper_status	toilet_refusal	period_start	period_end	recorded_days	bowel_days	longest_no_bowel_days	hard_days	pain_days	withholding_days	soiling_days	med_taken_days	summary_note	doctor_note
+00123	2026-01-10	profile	2023-04-15	2歳8か月	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	初回登録。慢性便秘でフォロー中。個人を直接特定する情報は入れない。
+00123	2026-01-10	prescription	-	-	モビコール	1包/日	毎日内服。便がゆるければ診察で相談。	-	-	-	-	-	-	-	-	-	-	-	-	-	-	硬便と排便時痛が残る。
+00123	2026-02-07	prescription	-	-	モビコール	1.5包/日	内服継続。	-	-	-	-	-	-	-	-	-	-	-	-	-	-	排便間隔は改善傾向。
+00123	2026-02-07	toilet_training	-	-	-	-	-	開始中	おむつ・パンツ併用	あり	-	-	-	-	-	-	-	-	-	-	-	便意時にトイレを嫌がる。
+00123	2026-02-01	diary_weekly	-	-	-	-	-	-	-	-	2026-02-01	2026-02-07	7	5	2	2	1	2	0	6	週の後半は軟らかめ。	内服できた日は排便あり。
+00123	2026-03-01	visit_summary	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	前回より排便頻度改善。痛みは軽減。	次回、減量可否とトイレ拒否を確認。

@@ -1261,14 +1261,13 @@ function generatePatientProfileHtml(params) {
 function formatVisitsForContext_(visits) {
   if (!visits.length) return ["- なし"];
   return visits.map((visit, index) => {
-    const questionnaire = visit.questionnaire || {};
     const diary = visit.diary || {};
+    const questionnaireText = visitQuestionnaireContextText_(visit);
     return [
       `${index + 1}. ${visit.submitted_at || visit.saved_at || "日付不明"} / ${visit.urgency_label || "区分不明"}`,
       `   年齢: ${visit.age_text_at_visit || "未確認"}, 年齢プロファイル=${visit.age_profile || "未記録"}, 質問セット=${visit.questionnaire_version || "未記録"}`,
       `   概要: ${visit.headline || "未記録"}`,
-      `   便: 最終排便=${questionnaire.q1_last_bowel_movement || "未確認"}, 頻度=${questionnaire.q2_bowel_frequency || "未確認"}, 硬さ=${questionnaire.q3_stool_consistency || "未確認"}, 痛み=${questionnaire.q4_pain || "未確認"}, がまん=${questionnaire.q5_withholding || "未確認"}`,
-      `   薬: ${questionnaire.q6_med_status || "未確認"}`,
+      `   問診: ${questionnaireText}`,
       `   日誌: 記録${diary.diary_days_recorded ?? "未確認"}日, 排便${diary.diary_bowel_days ?? "未確認"}日, 最長無排便${diary.diary_longest_no_bowel_days ?? "未確認"}日, 硬便${diary.diary_hard_days ?? "未確認"}日, 痛み${diary.diary_pain_days ?? "未確認"}日, 内服${diary.diary_med_taken_days ?? "未確認"}日`,
       visit.doctor_note ? `   医師メモ: ${visit.doctor_note}` : "",
     ].filter(Boolean).join("\n");
@@ -1276,8 +1275,8 @@ function formatVisitsForContext_(visits) {
 }
 
 function formatVisitHtml_(visit) {
-  const questionnaire = visit.questionnaire || {};
   const diary = visit.diary || {};
+  const questionnaireItems = visitQuestionnaireItems_(visit);
   return `
     <article class="visit">
       <p class="headline">${escapeHtml_(visit.submitted_at || visit.saved_at || "日付不明")} / ${escapeHtml_(visit.urgency_label || "区分不明")}</p>
@@ -1286,12 +1285,7 @@ function formatVisitHtml_(visit) {
         ${htmlItem_("受診時年齢", visit.age_text_at_visit)}
         ${htmlItem_("年齢プロファイル", displayAgeProfile_(visit.age_profile))}
         ${htmlItem_("質問セット", visit.questionnaire_version)}
-        ${htmlItem_("最終排便", questionnaire.q1_last_bowel_movement)}
-        ${htmlItem_("排便頻度", questionnaire.q2_bowel_frequency)}
-        ${htmlItem_("便の硬さ", questionnaire.q3_stool_consistency)}
-        ${htmlItem_("痛み", questionnaire.q4_pain)}
-        ${htmlItem_("がまん", questionnaire.q5_withholding)}
-        ${htmlItem_("薬", questionnaire.q6_med_status)}
+        ${questionnaireItems.map(([label, value]) => htmlItem_(label, value)).join("")}
         ${htmlItem_("日誌記録", diary.diary_days_recorded === undefined ? "" : `${diary.diary_days_recorded}日`)}
         ${htmlItem_("排便あり", diary.diary_bowel_days === undefined ? "" : `${diary.diary_bowel_days}日`)}
         ${htmlItem_("最長無排便", diary.diary_longest_no_bowel_days === undefined ? "" : `${diary.diary_longest_no_bowel_days}日`)}
@@ -1300,6 +1294,59 @@ function formatVisitHtml_(visit) {
         ${htmlItem_("内服できた日", diary.diary_med_taken_days === undefined ? "" : `${diary.diary_med_taken_days}日`)}
       </div>
     </article>`;
+}
+
+function visitQuestionnaireContextText_(visit) {
+  const items = visitQuestionnaireItems_(visit);
+  if (!items.length) return "未確認";
+  return items.map(([label, value]) => `${label}=${cellText_(value)}`).join(", ");
+}
+
+function visitQuestionnaireItems_(visit) {
+  const profile = normalizeAgeProfile_(visit.age_profile);
+  if (profile === "infant") return visitQuestionnaireItemsForProfile_(visit, [
+    ["最終排便", ["i1_last_bowel_movement", "q1_last_bowel_movement"]],
+    ["便の硬さ", ["i2_stool_consistency", "q3_stool_consistency"]],
+    ["排便時の様子", ["i3_stool_behavior", "q4_pain"]],
+    ["発症時期", ["i4_onset"]],
+    ["哺乳・食事", ["i6_feeding"]],
+    ["便秘対応", ["i10_constipation_support", "q6_med_status"]],
+  ]);
+  if (profile === "child") return visitQuestionnaireItemsForProfile_(visit, [
+    ["最終排便", ["c1_last_bowel_movement", "q1_last_bowel_movement"]],
+    ["便の硬さ", ["c2_stool_consistency", "q3_stool_consistency"]],
+    ["痛み・困りごと", ["c3_pain_problem", "q4_pain"]],
+    ["がまん・回避", ["c4_withholding", "q5_withholding"]],
+    ["便失禁・下着汚れ", ["c5_soiling", "q8_soiling"]],
+    ["園・学校トイレ", ["c6_school_toilet"]],
+    ["薬", ["c10_med_status", "q6_med_status"]],
+  ]);
+  return visitQuestionnaireItemsForProfile_(visit, [
+    ["最終排便", ["q1_last_bowel_movement"]],
+    ["排便頻度", ["q2_bowel_frequency"]],
+    ["便の硬さ", ["q3_stool_consistency"]],
+    ["痛み", ["q4_pain"]],
+    ["がまん", ["q5_withholding"]],
+    ["薬", ["q6_med_status"]],
+  ]);
+}
+
+function visitQuestionnaireItemsForProfile_(visit, definitions) {
+  const questionnaire = visit.questionnaire || {};
+  return definitions.map(([label, keys]) => [label, firstQuestionnaireValue_(questionnaire, keys)]);
+}
+
+function firstQuestionnaireValue_(questionnaire, keys) {
+  for (const key of keys) {
+    const value = questionnaire[key];
+    if (value !== "" && value !== null && value !== undefined) return displayQuestionnaireValue_(value);
+  }
+  return "";
+}
+
+function displayQuestionnaireValue_(value) {
+  if (Array.isArray(value)) return value.filter((item) => item !== "" && item !== null && item !== undefined).join("、");
+  return value;
 }
 
 function formatSimpleRowsHtml_(rows, keys, labels) {

@@ -1,0 +1,3 @@
+visit_id	patient_id	visit_token	submitted_at	saved_at	urgency_level	urgency_label	headline	questionnaire_json	diary_json	summary_text	facility_share_text	patient_memo_text	reviewed_by_doctor	doctor_note	age_profile	age_text_at_visit	questionnaire_version
+HIST-00123-20260110	00123		2026-01-10 09:00	2026-01-10 09:00	stable	通常確認	過去受診要約: 硬便と排便時痛が残る。	{}	{}	過去受診要約。排便間隔は2-3日に1回程度。硬便と排便時痛あり。モビコール開始・継続。			TRUE	次回、内服状況と排便時痛を確認。	toddler	2歳8か月	historical-summary
+HIST-00123-20260207	00123		2026-02-07 09:00	2026-02-07 09:00	stable	通常確認	過去受診要約: 排便頻度は改善傾向。	{}	{}	過去受診要約。排便頻度は改善傾向。トイレ拒否あり。			TRUE	トイレ拒否と痛みの関連を確認。	toddler	2歳9か月	historical-summary

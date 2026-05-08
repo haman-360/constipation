@@ -632,10 +632,16 @@ function generateDoctorHistoryHtml(params) {
       .visit:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
       .headline { font-weight: 800; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-      .item { padding: 10px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
+      .item { padding: 10px; border: 1px solid #d9e0e8; border-left-width: 6px; border-radius: 8px; background: #fbfdfe; }
+      .item--meta { border-left-color: #8b96a5; background: #fbfdfe; }
+      .item--good { border-color: #a8d5b2; border-left-color: #1f8a4c; background: #f2fbf5; }
+      .item--check { border-color: #f0d48a; border-left-color: #bd7b00; background: #fff9e8; }
+      .item--warn { border-color: #eeaaa4; border-left-color: #c5332b; background: #fff1ef; }
+      .item--missing { border-color: #d9e0e8; border-left-color: #b4bdc8; background: #f6f8fa; color: #5d6673; }
       .label { display: block; color: #5d6673; font-size: .86rem; }
       .summary-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
       .summary-list li { padding: 12px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; line-height: 1.65; }
+      .summary-list li:first-child { border-left: 6px solid #bd7b00; background: #fff9e8; }
       .summary-list strong { display: block; margin-bottom: 4px; }
       details { margin-top: 16px; }
       summary { color: #07576b; cursor: pointer; font-weight: 800; }
@@ -1282,9 +1288,9 @@ function formatVisitHtml_(visit) {
       <p class="headline">${escapeHtml_(visit.submitted_at || visit.saved_at || "日付不明")} / ${escapeHtml_(visit.urgency_label || "区分不明")}</p>
       <p>${escapeHtml_(visit.headline || "概要未記録")}</p>
       <div class="grid">
-        ${htmlItem_("受診時年齢", visit.age_text_at_visit)}
-        ${htmlItem_("年齢プロファイル", displayAgeProfile_(visit.age_profile))}
-        ${htmlItem_("質問セット", visit.questionnaire_version)}
+        ${htmlItem_("受診時年齢", visit.age_text_at_visit, "meta")}
+        ${htmlItem_("年齢プロファイル", displayAgeProfile_(visit.age_profile), "meta")}
+        ${htmlItem_("質問セット", visit.questionnaire_version, "meta")}
         ${questionnaireItems.map(([label, value]) => htmlItem_(label, value)).join("")}
         ${htmlItem_("日誌記録", diary.diary_days_recorded === undefined ? "" : `${diary.diary_days_recorded}日`)}
         ${htmlItem_("排便あり", diary.diary_bowel_days === undefined ? "" : `${diary.diary_bowel_days}日`)}
@@ -1360,8 +1366,26 @@ function formatSimpleRowsHtml_(rows, keys, labels) {
   `).join("");
 }
 
-function htmlItem_(label, value) {
-  return `<div class="item"><span class="label">${escapeHtml_(label)}</span><strong>${escapeHtml_(cellText_(value))}</strong></div>`;
+function htmlItem_(label, value, forcedLevel) {
+  const level = forcedLevel || itemImportanceLevel_(label, value);
+  return `<div class="item item--${escapeHtml_(level)}"><span class="label">${escapeHtml_(label)}</span><strong>${escapeHtml_(cellText_(value))}</strong></div>`;
+}
+
+function itemImportanceLevel_(label, value) {
+  const text = cellText_(value);
+  if (text === "未記録" || text === "未確認" || text === "なし") return "missing";
+  const combined = `${label} ${text}`;
+
+  if (/(4日以上|強く痛がる|泣く|とても嫌がる|血|嘔吐|吐|食欲低下|ぐったり|腹部膨満|おなかが張|週1回以上ある|毎日ある|水のよう|水っぽい|下痢|トイレが詰まりそう)/.test(combined)) {
+    return "warn";
+  }
+  if (/(2-3日前|2-3日に1回|硬い|コロコロ|とても大きい|痛|嫌がる|がまん|我慢|回避|便失禁|下着汚れ|便もれ|行きたいけれど|先生に言いにくい|ときどきある|飲みにく|忘れる|少なめ|中止|困っている|不安|学校や園で困っている|夜尿|おなかが痛い|水分が少ない|朝の時間がなく)/.test(combined)) {
+    return "check";
+  }
+  if (/(今日|昨日|1日1回|痛がらない|ない|特にない|行ける|普通|やわらかい|先生に言われた量で飲んでいる|便秘薬は使っていない)/.test(combined)) {
+    return "good";
+  }
+  return "meta";
 }
 
 function displayAgeProfile_(profile) {

@@ -443,6 +443,78 @@ function dateTimeInScriptTimezone_(value) {
   }
 }
 
+function dateSortKey_(value) {
+  const date = parseDateTimeValue_(value);
+  return date ? date.getTime() : 0;
+}
+
+function parseDateTimeValue_(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+  const parts = dateParts_(value);
+  if (!parts) return null;
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
+function dateParts_(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return {
+      year: value.getFullYear(),
+      month: value.getMonth() + 1,
+      day: value.getDate(),
+      hour: value.getHours(),
+      minute: value.getMinutes(),
+      second: value.getSeconds(),
+      hasTime: value.getHours() !== 0 || value.getMinutes() !== 0 || value.getSeconds() !== 0,
+    };
+  }
+  const text = String(value || "").trim();
+  const match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!match) return null;
+  const parts = {
+    year: Number.parseInt(match[1], 10),
+    month: Number.parseInt(match[2], 10),
+    day: Number.parseInt(match[3], 10),
+    hour: match[4] === undefined ? 0 : Number.parseInt(match[4], 10),
+    minute: match[5] === undefined ? 0 : Number.parseInt(match[5], 10),
+    second: match[6] === undefined ? 0 : Number.parseInt(match[6], 10),
+    hasTime: match[4] !== undefined,
+  };
+  if (!isValidDateParts_(parts)) return null;
+  return parts;
+}
+
+function isValidDateParts_(parts) {
+  if (!parts) return false;
+  const { year, month, day, hour, minute, second } = parts;
+  if (![year, month, day, hour, minute, second].every(Number.isFinite)) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return false;
+  const date = new Date(year, month - 1, day, hour, minute, second);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function displayDateTime_(value) {
+  const parts = dateParts_(value);
+  if (!parts) return value === "" || value === null || value === undefined ? "未記録" : String(value);
+  const dateText = `${parts.year}-${pad2_(parts.month)}-${pad2_(parts.day)}`;
+  if (!parts.hasTime) return dateText;
+  const timeText = `${pad2_(parts.hour)}:${pad2_(parts.minute)}`;
+  return parts.second ? `${dateText} ${timeText}:${pad2_(parts.second)}` : `${dateText} ${timeText}`;
+}
+
+function displayDate_(value) {
+  const parts = dateParts_(value);
+  if (!parts) return value === "" || value === null || value === undefined ? "未記録" : String(value);
+  return `${parts.year}-${pad2_(parts.month)}-${pad2_(parts.day)}`;
+}
+
+function pad2_(value) {
+  return String(value).padStart(2, "0");
+}
+
 function visitIdInScriptTimezone_(visitId, submittedAt, patientId, visitToken) {
   const token = String(visitToken || "")
     .replace(/[^A-Za-z0-9]/g, "")
@@ -1270,7 +1342,7 @@ function formatVisitsForContext_(visits) {
     const diary = visit.diary || {};
     const questionnaireText = visitQuestionnaireContextText_(visit);
     return [
-      `${index + 1}. ${visit.submitted_at || visit.saved_at || "日付不明"} / ${visit.urgency_label || "区分不明"}`,
+      `${index + 1}. ${displayDateTime_(visit.submitted_at || visit.saved_at)} / ${visit.urgency_label || "区分不明"}`,
       `   年齢: ${visit.age_text_at_visit || "未確認"}, 年齢プロファイル=${visit.age_profile || "未記録"}, 質問セット=${visit.questionnaire_version || "未記録"}`,
       `   概要: ${visit.headline || "未記録"}`,
       `   問診: ${questionnaireText}`,
@@ -1285,7 +1357,7 @@ function formatVisitHtml_(visit) {
   const questionnaireItems = visitQuestionnaireItems_(visit);
   return `
     <article class="visit">
-      <p class="headline">${escapeHtml_(visit.submitted_at || visit.saved_at || "日付不明")} / ${escapeHtml_(visit.urgency_label || "区分不明")}</p>
+      <p class="headline">${escapeHtml_(displayDateTime_(visit.submitted_at || visit.saved_at))} / ${escapeHtml_(visit.urgency_label || "区分不明")}</p>
       <p>${escapeHtml_(visit.headline || "概要未記録")}</p>
       <div class="grid">
         ${htmlItem_("受診時年齢", visit.age_text_at_visit, "meta")}
@@ -1441,12 +1513,14 @@ function formatSimpleRowsForContext_(rows, keys, labels) {
 
 function cellText_(value) {
   if (value === "" || value === null || value === undefined) return "未記録";
-  if (value instanceof Date) return dateTimeInScriptTimezone_(value);
+  if (value instanceof Date) return displayDateTime_(value);
   return String(value);
 }
 
 function displayValueForKey_(key, value) {
   if (value === "" || value === null || value === undefined) return "";
+  if (["date", "submitted_at", "saved_at"].includes(key)) return displayDateTime_(value);
+  if (["period_start", "period_end", "birth_date"].includes(key)) return displayDate_(value);
   const dayCountKeys = [
     "recorded_days",
     "bowel_days",
@@ -1531,7 +1605,7 @@ function parseJsonCell_(value) {
 function latestByDate_(rows, limit, dateKey) {
   return rows
     .slice()
-    .sort((a, b) => String(b[dateKey] || "").localeCompare(String(a[dateKey] || "")))
+    .sort((a, b) => dateSortKey_(b[dateKey]) - dateSortKey_(a[dateKey]))
     .slice(0, limit);
 }
 
@@ -1593,7 +1667,10 @@ function formatTemplateSheet_(sheet, definition) {
     .setBackground("#e8f3ec")
     .setVerticalAlignment("middle")
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
-  fullRange.setVerticalAlignment("top");
+  fullRange
+    .setFontFamily("Arial")
+    .setFontSize(10)
+    .setVerticalAlignment("top");
   if (lastRow > 1) {
     sheet.getRange(2, 1, lastRow - 1, headers.length).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
   }

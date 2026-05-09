@@ -775,8 +775,6 @@ function generateDoctorHistoryHtml(params) {
   const treatmentContextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5), { mode: "treatmentReview" });
   const entryUrl = buildSelfUrl_("doctorEntry", history.patient_id, normalizeLimit_(params.limit, 5));
   const profileUrl = buildSelfUrl_("patientProfile", history.patient_id, normalizeLimit_(params.limit, 5));
-  const preVisitContextText = generateChatGPTContext({ ...params, mode: "preVisit" });
-  const treatmentContextText = generateChatGPTContext({ ...params, mode: "treatmentReview" });
   const preVisitItems = formatPreVisitItemsHtml_(history);
   const visitItems = history.visits.length
     ? history.visits.map(formatVisitHtml_).join("")
@@ -786,6 +784,7 @@ function generateDoctorHistoryHtml(params) {
 <html lang="ja">
   <head>
     <meta charset="utf-8">
+    <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>便秘履歴 ${escapeHtml_(history.patient_id)}</title>
     <style>
@@ -841,18 +840,18 @@ function generateDoctorHistoryHtml(params) {
       <details>
         <summary>ChatGPT診察前整理テキストをページ内で表示</summary>
         <div class="copy-row">
-          <button type="button" data-copy-target="preVisitContextText" data-copy-status="preVisitContextStatus">診察前整理テキストをコピー</button>
+          <button type="button" data-copy-target="preVisitContextText" data-copy-status="preVisitContextStatus" data-context-mode="preVisit">診察前整理テキストをコピー</button>
           <span id="preVisitContextStatus" class="copy-status"></span>
         </div>
-        <pre id="preVisitContextText">${escapeHtml_(preVisitContextText)}</pre>
+        <pre id="preVisitContextText" data-context-mode="preVisit">未読み込みです。開くかコピーすると読み込みます。</pre>
       </details>
       <details>
         <summary>ChatGPT治療方針検討テキストをページ内で表示</summary>
         <div class="copy-row">
-          <button type="button" data-copy-target="treatmentContextText" data-copy-status="treatmentContextStatus">治療方針検討テキストをコピー</button>
+          <button type="button" data-copy-target="treatmentContextText" data-copy-status="treatmentContextStatus" data-context-mode="treatmentReview">治療方針検討テキストをコピー</button>
           <span id="treatmentContextStatus" class="copy-status"></span>
         </div>
-        <pre id="treatmentContextText">${escapeHtml_(treatmentContextText)}</pre>
+        <pre id="treatmentContextText" data-context-mode="treatmentReview">未読み込みです。開くかコピーすると読み込みます。</pre>
       </details>
       <section class="panel">
         <h2>診察前の確認</h2>
@@ -878,11 +877,46 @@ function generateDoctorHistoryHtml(params) {
       </section>
     </main>
     <script>
+      const patientId = ${JSON.stringify(history.patient_id)};
+      const historyLimit = ${JSON.stringify(normalizeLimit_(params.limit, 5))};
+
+      function loadContextText(mode, status) {
+        const target = document.querySelector('pre[data-context-mode="' + mode + '"]');
+        if (!target) return Promise.resolve("");
+        if (target.dataset.loaded === "true") return Promise.resolve(target.textContent || "");
+        target.textContent = "読み込み中です...";
+        if (status) status.textContent = "読み込み中です...";
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler((text) => {
+              target.dataset.loaded = "true";
+              target.textContent = text || "";
+              if (status) status.textContent = "";
+              resolve(target.textContent || "");
+            })
+            .withFailureHandler((error) => {
+              const message = "読み込めませんでした: " + (error && error.message ? error.message : error);
+              target.textContent = message;
+              if (status) status.textContent = message;
+              reject(error);
+            })
+            .generateChatGPTContext({ patient_id: patientId, limit: historyLimit, mode });
+        });
+      }
+
+      document.querySelectorAll("details").forEach((details) => {
+        details.addEventListener("toggle", () => {
+          if (!details.open) return;
+          const target = details.querySelector("pre[data-context-mode]");
+          if (target) loadContextText(target.dataset.contextMode);
+        });
+      });
+
       document.querySelectorAll("[data-copy-target]").forEach((button) => {
         button.addEventListener("click", async () => {
           const target = document.getElementById(button.dataset.copyTarget);
           const status = document.getElementById(button.dataset.copyStatus);
-          const text = target ? target.textContent || "" : "";
+          const text = await loadContextText(button.dataset.contextMode, status);
           try {
             await navigator.clipboard.writeText(text);
             if (status) status.textContent = "コピーしました。";
@@ -1141,6 +1175,7 @@ function generateDoctorEntryHtml(params) {
 <html lang="ja">
   <head>
     <meta charset="utf-8">
+    <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>医師入力 ${escapeHtml_(patientId)}</title>
     <style>
@@ -1367,6 +1402,7 @@ function generatePatientProfileHtml(params) {
 <html lang="ja">
   <head>
     <meta charset="utf-8">
+    <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>患者台帳 ${escapeHtml_(patientId)}</title>
     <style>
@@ -1965,6 +2001,7 @@ function redirectResponse_(url) {
 <html lang="ja">
   <head>
     <meta charset="utf-8">
+    <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>保存しました</title>
     <script>

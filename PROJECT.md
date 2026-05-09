@@ -262,6 +262,7 @@ MVP → Google Sheets連携の動作確認済み段階
 - 患者IDは `00100` から `99999` の5桁として扱い、先頭ゼロを省略しない。
 - `patients.background_history` に、基礎疾患・既往歴・周産期/新生児期情報を医師側台帳で登録できる。例: 重症新生児仮死、NICU入院歴、極低出生体重児、出生時からの便秘など。
 - `patients.background_flags` / `background_status` / `background_updated_at` で、夜尿症、発達相談、他院通院、周産期歴などを構造化して管理できる。患者問診では登録済み背景を表示し、変更時だけ補足入力する。
+- `background_flags` の固定タグ候補は `background_flags_glossary_draft.md` でレビュー中。
 - Google Sheetsの `patient_id` / `visit_id` / `visit_token` 等のID列は文字列形式に固定する。
 - `submitVisit` 保存時に、未登録患者IDを `patients` へ自動追加し、直近日誌入力がある場合は `diary_weekly` へ自動保存する。
 - `patients.birth_date` に生年月日を入力しておくと、便秘履歴とChatGPT貼り付け用テキストでは直近受診日を基準に年齢を自動計算する。

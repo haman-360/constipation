@@ -101,21 +101,35 @@ const HISTORY_LABELS = {
   questionnaire_version: "質問セット",
 };
 
-const BACKGROUND_FLAG_OPTIONS = [
-  "夜尿症で相談中",
-  "昼間尿失禁・排尿相談中",
-  "発達について相談中",
-  "療育・発達支援を利用中",
-  "他院に通院中の病気がある",
-  "他院で長く飲んでいる薬がある",
-  "早産・低出生体重・NICU入院歴",
-  "新生児仮死・周産期合併症",
-  "神経・筋疾患",
-  "消化器・肛門疾患または手術歴",
-  "泌尿器科通院中",
-  "園・学校で排便やトイレ配慮あり",
+const BACKGROUND_FLAG_DEFINITIONS = [
+  { tag: "夜尿あり", category: "変化しうる併存相談", patientVisible: true, patientLabel: "夜尿あり", skipUrinaryQuestion: true, skipBackgroundQuestion: false },
+  { tag: "昼間尿失禁あり", category: "変化しうる併存相談", patientVisible: true, patientLabel: "昼間尿失禁あり", skipUrinaryQuestion: true, skipBackgroundQuestion: false },
+  { tag: "昼間尿失禁で相談中", category: "変化しうる併存相談", patientVisible: true, patientLabel: "昼間尿失禁で相談中", skipUrinaryQuestion: true, skipBackgroundQuestion: false },
+  { tag: "泌尿器科通院中", category: "変化しうる併存相談", patientVisible: true, patientLabel: "泌尿器科通院中", skipUrinaryQuestion: true, skipBackgroundQuestion: false },
+  { tag: "発達について相談中", category: "変化しうる併存相談", patientVisible: true, patientLabel: "発達について相談中", skipUrinaryQuestion: false, skipBackgroundQuestion: true },
+  { tag: "発達遅滞または発達特性あり", category: "変化しうる併存相談", patientVisible: true, patientLabel: "発達について相談中", skipUrinaryQuestion: false, skipBackgroundQuestion: true },
+  { tag: "療育・発達支援を利用中", category: "変化しうる併存相談", patientVisible: true, patientLabel: "療育・発達支援を利用中", skipUrinaryQuestion: false, skipBackgroundQuestion: true },
+  { tag: "他院に通院中の病気がある", category: "変化しうる併存相談", patientVisible: true, patientLabel: "他院に通院中の病気がある", skipUrinaryQuestion: false, skipBackgroundQuestion: true },
+  { tag: "他院で長く飲んでいる薬がある", category: "変化しうる併存相談", patientVisible: true, patientLabel: "他院で長く飲んでいる薬がある", skipUrinaryQuestion: false, skipBackgroundQuestion: true },
+  { tag: "園・学校で排便やトイレ配慮あり", category: "変化しうる併存相談", patientVisible: true, patientLabel: "園・学校で排便やトイレ配慮あり", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "排便姿勢・トイレ介助が必要", category: "変化しうる併存相談", patientVisible: true, patientLabel: "排便姿勢・トイレ介助が必要", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "早産・低出生体重・NICU入院歴", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "新生児仮死・周産期合併症", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "出生直後から便秘", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "胎便排泄遅延の既往", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "小児外科紹介・受診歴あり", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "肛門・直腸の手術歴あり", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "神経・筋疾患", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
+  { tag: "便秘に影響しうる薬あり", category: "固定既往歴", patientVisible: false, patientLabel: "", skipUrinaryQuestion: false, skipBackgroundQuestion: false },
 ];
 
+const BACKGROUND_FLAG_OPTIONS = BACKGROUND_FLAG_DEFINITIONS.map((definition) => definition.tag);
+const BACKGROUND_FLAG_ALIASES = {
+  "夜尿症で相談中": "夜尿あり",
+  "昼間尿失禁・排尿相談中": "昼間尿失禁で相談中",
+  "消化器・肛門疾患または手術歴": "小児外科紹介・受診歴あり",
+  "ヒルシュスプルング病評価歴あり": "小児外科紹介・受診歴あり",
+};
 const BACKGROUND_STATUS_OPTIONS = ["継続中", "過去にあり", "終了", "不明"];
 
 const SHEET_DEFINITIONS = [
@@ -605,13 +619,31 @@ function normalizeBackgroundFlags_(value) {
   const values = Array.isArray(value) ? value : String(value || "").split(/[、,\n]/);
   const allowed = new Set(BACKGROUND_FLAG_OPTIONS);
   return values
-    .map((item) => String(item || "").trim())
+    .map((item) => BACKGROUND_FLAG_ALIASES[String(item || "").trim()] || String(item || "").trim())
     .filter((item, index, array) => item && allowed.has(item) && array.indexOf(item) === index);
 }
 
 function normalizeBackgroundStatus_(value) {
   const text = String(value || "").trim();
   return BACKGROUND_STATUS_OPTIONS.includes(text) ? text : "";
+}
+
+function backgroundFlagDefinition_(tag) {
+  return BACKGROUND_FLAG_DEFINITIONS.find((definition) => definition.tag === tag) || null;
+}
+
+function patientVisibleBackgroundLabels_(flags) {
+  const labels = flags
+    .map((tag) => backgroundFlagDefinition_(tag))
+    .filter((definition) => definition && definition.patientVisible)
+    .map((definition) => definition.patientLabel || definition.tag);
+  return labels.filter((label, index, array) => array.indexOf(label) === index);
+}
+
+function backgroundHasSkipRule_(flags, key) {
+  return flags
+    .map((tag) => backgroundFlagDefinition_(tag))
+    .some((definition) => definition && definition[key]);
 }
 
 function addDays_(dateText, days) {
@@ -873,7 +905,8 @@ function getPatientProfileData(params) {
   const referenceDate = dateTimeInScriptTimezone_(new Date());
   const patient = getPatient_(patientId);
   const ageProfile = patientAgeProfile_(patient, referenceDate);
-  const backgroundSummary = patientBackgroundSummary_(patient);
+  const backgroundSummary = patientBackgroundSummary_(patient, { patientFacing: true });
+  const backgroundFlags = normalizeBackgroundFlags_(patient.background_flags);
   return {
     ok: true,
     patient_id: patientId,
@@ -882,22 +915,28 @@ function getPatientProfileData(params) {
     age_profile_label: ageProfileLabel_(ageProfile),
     questionnaire_version: normalizeQuestionnaireVersion_("", ageProfile),
     background_summary: backgroundSummary,
-    background_flags: normalizeBackgroundFlags_(patient.background_flags),
+    background_flags: backgroundFlags,
+    background_patient_visible_flags: patientVisibleBackgroundLabels_(backgroundFlags),
+    background_skip_urinary_question: backgroundHasSkipRule_(backgroundFlags, "skipUrinaryQuestion"),
+    background_skip_background_question: backgroundHasSkipRule_(backgroundFlags, "skipBackgroundQuestion"),
     background_status: String(patient.background_status || ""),
     background_updated_at: dateInputValue_(patient.background_updated_at),
     has_background_context: Boolean(backgroundSummary),
   };
 }
 
-function patientBackgroundSummary_(patient) {
+function patientBackgroundSummary_(patient, options) {
   if (!patient) return "";
+  const patientFacing = Boolean(options && options.patientFacing);
   const parts = [];
   const flags = normalizeBackgroundFlags_(patient.background_flags);
-  if (flags.length) parts.push(flags.join("、"));
+  const displayFlags = patientFacing ? patientVisibleBackgroundLabels_(flags) : flags;
+  if (patientFacing && !displayFlags.length) return "";
+  if (displayFlags.length) parts.push(displayFlags.join("、"));
   if (patient.background_status) parts.push(`状態: ${patient.background_status}`);
   const updatedAt = dateInputValue_(patient.background_updated_at);
   if (updatedAt) parts.push(`最終確認: ${updatedAt}`);
-  if (patient.background_history) parts.push(`補足: ${patient.background_history}`);
+  if (!patientFacing && patient.background_history) parts.push(`補足: ${patient.background_history}`);
   return parts.join(" / ");
 }
 

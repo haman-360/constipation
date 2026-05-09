@@ -1,5 +1,5 @@
 patient_id	record_date	record_type	birth_date	age_memo	background_history	background_flags	background_status	background_updated_at	medicine_name	dose	instruction	training_status	diaper_status	toilet_refusal	period_start	period_end	recorded_days	bowel_days	longest_no_bowel_days	hard_days	pain_days	withholding_days	soiling_days	med_taken_days	summary_note	doctor_note
-00123	2026-01-10	profile	2023-04-15	2歳8か月	重症新生児仮死でNICU入院歴あり。極低出生体重児。出生時から便秘。	早産・低出生体重・NICU入院歴、新生児仮死・周産期合併症	継続中	2026-01-10	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	初回登録。慢性便秘でフォロー中。個人を直接特定する情報は入れない。
+00123	2026-01-10	profile	2023-04-15	2歳8か月	重症新生児仮死でNICU入院歴あり。極低出生体重児。出生時から便秘。	早産・低出生体重・NICU入院歴、新生児仮死・周産期合併症、出生直後から便秘	継続中	2026-01-10	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	初回登録。慢性便秘でフォロー中。個人を直接特定する情報は入れない。
 00123	2026-01-10	prescription	-	-	-	-	-	-	モビコール	1包/日	毎日内服。便がゆるければ診察で相談。	-	-	-	-	-	-	-	-	-	-	-	-	-	-	硬便と排便時痛が残る。
 00123	2026-02-07	prescription	-	-	-	-	-	-	モビコール	1.5包/日	内服継続。	-	-	-	-	-	-	-	-	-	-	-	-	-	-	排便間隔は改善傾向。
 00123	2026-02-07	toilet_training	-	-	-	-	-	-	-	-	-	開始中	おむつ・パンツ併用	あり	-	-	-	-	-	-	-	-	-	-	-	便意時にトイレを嫌がる。

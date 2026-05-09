@@ -263,8 +263,8 @@ function renderIntro() {
     ? "年齢情報を確認できませんでした。このまま問診を続けられます。診察時に年齢を確認します。"
     : profileNotes[activeAgeProfile] || profileNotes.toddler;
   const backgroundSummary = patientProfileData && patientProfileData.has_background_context ? String(patientProfileData.background_summary || "") : "";
-  const backgroundFlags = patientProfileData && Array.isArray(patientProfileData.background_flags) ? patientProfileData.background_flags : [];
-  const canSkipUrinary = backgroundFlags.some((item) => item.includes("夜尿") || item.includes("尿失禁") || item.includes("泌尿器"));
+  const canSkipUrinary = Boolean(patientProfileData && patientProfileData.background_skip_urinary_question);
+  const canSkipBackground = Boolean(patientProfileData && patientProfileData.background_skip_background_question);
   els.screen.innerHTML = `
     <div class="intro">
       <h1>うんちの様子を教えてください</h1>
@@ -293,6 +293,7 @@ function renderIntro() {
   if (backgroundSummary) {
     state.answers.patient_background_registered = backgroundSummary;
     if (canSkipUrinary) state.answers.patient_background_skip_urinary = "1";
+    if (canSkipBackground) state.answers.patient_background_skip_background = "1";
     const backgroundChangeNote = document.getElementById("backgroundChangeNote");
     backgroundChangeNote.addEventListener("input", () => {
       const note = backgroundChangeNote.value.trim().slice(0, 200);

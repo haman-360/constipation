@@ -421,7 +421,7 @@
   ];
 
   const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at", "age_years", "age_months", "age_profile", "questionnaire_version"];
-  const PATIENT_CONTEXT_FIELD_IDS = ["patient_background_registered", "patient_background_change_note", "patient_background_skip_urinary"];
+  const PATIENT_CONTEXT_FIELD_IDS = ["patient_background_registered", "patient_background_change_note", "patient_background_skip_urinary", "patient_background_skip_background"];
 
   const TODDLER_QUESTIONNAIRE_FIELD_IDS = [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER];
   const QUESTIONNAIRE_FIELD_IDS = [...TODDLER_QUESTIONNAIRE_FIELD_IDS, ...INFANT_BASIC_IDS, ...INFANT_CONDITIONAL_IDS, ...CHILD_BASIC_IDS, ...CHILD_CONDITIONAL_IDS];
@@ -475,7 +475,7 @@
 
   function visibleChildFieldIds(data) {
     const ids = [...CHILD_BASIC_IDS];
-    if (data.patient_background_registered) {
+    if (data.patient_background_skip_background) {
       const backgroundIndex = ids.indexOf("c11_background");
       if (backgroundIndex !== -1) ids.splice(backgroundIndex, 1);
     }

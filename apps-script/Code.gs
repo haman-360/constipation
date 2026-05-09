@@ -1382,8 +1382,8 @@ function generatePatientProfileHtml(params) {
       .notice.saving { border-color: #d6a740; background: #fff7df; color: #7a4d00; }
       .notice.error { border-color: #d8a1a1; background: #fdecec; color: #8a2d2d; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-      label, .field-label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
-      input, textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; background: #fff; }
+      label, .field-label { display: grid; gap: 6px; min-width: 0; color: #5d6673; font-weight: 800; }
+      input, textarea, select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; background: #fff; }
       textarea { min-height: 110px; resize: vertical; }
       .wide { grid-column: 1 / -1; }
       .checkbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -1393,7 +1393,7 @@ function generatePatientProfileHtml(params) {
       button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
       button:disabled { cursor: wait; opacity: .62; }
       a { color: #07576b; font-weight: 800; }
-      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+      @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>

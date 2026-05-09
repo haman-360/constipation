@@ -260,11 +260,13 @@ MVP → Google Sheets連携の動作確認済み段階
 - `Code.gs` は単独Apps Scriptでも動くよう `SPREADSHEET_ID` 指定に対応。
 - Sheets表示改善として列幅、折り返し、固定列、JSON列非表示を追加。
 - 患者IDは `00100` から `99999` の5桁として扱い、先頭ゼロを省略しない。
+- `patients.background_history` に、基礎疾患・既往歴・周産期/新生児期情報を医師側台帳で登録できる。例: 重症新生児仮死、NICU入院歴、極低出生体重児、出生時からの便秘など。
+- `patients.background_flags` / `background_status` / `background_updated_at` で、夜尿症、発達相談、他院通院、周産期歴などを構造化して管理できる。患者問診では登録済み背景を表示し、変更時だけ補足入力する。
 - Google Sheetsの `patient_id` / `visit_id` / `visit_token` 等のID列は文字列形式に固定する。
 - `submitVisit` 保存時に、未登録患者IDを `patients` へ自動追加し、直近日誌入力がある場合は `diary_weekly` へ自動保存する。
 - `patients.birth_date` に生年月日を入力しておくと、便秘履歴とChatGPT貼り付け用テキストでは直近受診日を基準に年齢を自動計算する。
 - 患者画面では年齢を入力させない。初診後に医師が `patients.birth_date` を1回入力し、再診時は患者IDと受診日から年齢を算出する。
-- `patientProfile` で、医師側から `patients.birth_date` と台帳メモを登録できる。
+- `patientProfile` で、医師側から `patients.birth_date`、基礎疾患・既往歴、併存相談チェック、台帳メモを登録できる。
 - 初診時のみ受付または医師側で `patients.birth_date` を登録し、再診時は患者IDと受診日から年齢を自動計算する。
 - 医師側履歴、患者台帳、ChatGPT貼り付け用テキストでは、`patients.birth_date` と直近受診日から `infant` / `toddler` / `child` / `unknown` の年齢プロファイルを表示する。
 - 患者問診ページは、URLの患者IDを使ってWeb Appへ患者台帳を照会し、`infant` / `toddler` / `child` の質問セットを切り替える。照会失敗、年齢未登録、年齢不明時は `toddler-mvp-v1` で続行する。

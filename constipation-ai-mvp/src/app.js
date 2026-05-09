@@ -37,6 +37,7 @@ const visitMetaFromUrl = normalizeVisitMeta({
 let activeAgeProfile = normalizeAgeProfile(visitMetaFromUrl.age_profile);
 let activeQuestionnaireVersion = questionnaireVersionForProfile(activeAgeProfile);
 let profileLookupStatus = ageProfileFromUrl ? "url" : "pending";
+let patientProfileData = null;
 
 const state = {
   started: false,
@@ -71,6 +72,7 @@ async function loadAgeProfileFromWebApp() {
     const response = await fetch(url.toString(), { method: "GET", mode: "cors" });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    patientProfileData = result;
     if (result.age_profile && result.age_profile !== "unknown") {
       setActiveAgeProfile(result.age_profile, "patientProfile");
     } else {
@@ -260,6 +262,9 @@ function renderIntro() {
   const lookupNote = profileLookupStatus === "fallback"
     ? "年齢情報を確認できませんでした。このまま問診を続けられます。診察時に年齢を確認します。"
     : profileNotes[activeAgeProfile] || profileNotes.toddler;
+  const backgroundSummary = patientProfileData && patientProfileData.has_background_context ? String(patientProfileData.background_summary || "") : "";
+  const backgroundFlags = patientProfileData && Array.isArray(patientProfileData.background_flags) ? patientProfileData.background_flags : [];
+  const canSkipUrinary = backgroundFlags.some((item) => item.includes("夜尿") || item.includes("尿失禁") || item.includes("泌尿器"));
   els.screen.innerHTML = `
     <div class="intro">
       <h1>うんちの様子を教えてください</h1>
@@ -267,10 +272,37 @@ function renderIntro() {
       わかる範囲で、近いものを選んでください。<br>
       薬の量をこの画面で決めることはありません。</p>
       <p class="intro-save-note">${escapeHtml(lookupNote)}</p>
+      ${
+        backgroundSummary
+          ? `
+            <section class="intro-profile">
+              <h2>登録済みの基礎疾患・併存相談</h2>
+              <p>${escapeHtml(backgroundSummary)}</p>
+              <label>
+                <span>変更や追加がある場合だけ入力してください</span>
+                <textarea id="backgroundChangeNote" class="text-input text-input--compact" maxlength="200" placeholder="例: 夜尿症の治療は終了した、発達相談が新しく始まった">${escapeHtml(state.answers.patient_background_change_note || "")}</textarea>
+              </label>
+            </section>
+          `
+          : ""
+      }
       <p class="intro-save-note">最後に院内保存の完了表示が出るまで、この画面を閉じずにお待ちください。入力内容は最後にメモとしてコピーできます。</p>
       <button id="startButton" class="button" type="button">はじめる</button>
     </div>
   `;
+  if (backgroundSummary) {
+    state.answers.patient_background_registered = backgroundSummary;
+    if (canSkipUrinary) state.answers.patient_background_skip_urinary = "1";
+    const backgroundChangeNote = document.getElementById("backgroundChangeNote");
+    backgroundChangeNote.addEventListener("input", () => {
+      const note = backgroundChangeNote.value.trim().slice(0, 200);
+      if (note) {
+        state.answers.patient_background_change_note = note;
+      } else {
+        delete state.answers.patient_background_change_note;
+      }
+    });
+  }
   document.getElementById("startButton").addEventListener("click", () => {
     state.started = true;
     state.index = 0;

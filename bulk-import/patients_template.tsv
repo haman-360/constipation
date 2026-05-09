@@ -1,3 +1,3 @@
-patient_id	age_years	age_months	created_at	note	birth_date
-00123			2026-01-10 09:00	慢性便秘でフォロー中。現在の主な確認点: 内服継続状況、排便時痛、トイレ拒否。	2023-04-15
-00124			2026-01-10 09:00	既存患者登録用サンプル。個人を直接特定する情報は入れない。	2022-11-20
+patient_id	age_years	age_months	created_at	note	birth_date	background_history	background_flags	background_status	background_updated_at
+00123			2026-01-10 09:00	慢性便秘でフォロー中。現在の主な確認点: 内服継続状況、排便時痛、トイレ拒否。	2023-04-15	重症新生児仮死でNICU入院歴あり。極低出生体重児。出生時から便秘。	早産・低出生体重・NICU入院歴、新生児仮死・周産期合併症	継続中	2026-01-10
+00124			2026-01-10 09:00	既存患者登録用サンプル。個人を直接特定する情報は入れない。	2022-11-20				

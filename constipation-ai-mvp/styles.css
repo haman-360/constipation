@@ -146,6 +146,33 @@ h3 {
   font-weight: 700;
 }
 
+.intro-profile {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfe;
+}
+
+.intro-profile h2 {
+  margin-bottom: 0;
+}
+
+.intro-profile p {
+  margin-bottom: 0;
+  color: var(--ink);
+}
+
+.intro-profile label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .progress {
   padding: 20px 24px 0;
 }

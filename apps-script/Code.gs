@@ -15,6 +15,10 @@ const PATIENTS_HEADERS = [
   "created_at",
   "note",
   "birth_date",
+  "background_history",
+  "background_flags",
+  "background_status",
+  "background_updated_at",
 ];
 
 const VISITS_HEADERS = [
@@ -97,8 +101,25 @@ const HISTORY_LABELS = {
   questionnaire_version: "質問セット",
 };
 
+const BACKGROUND_FLAG_OPTIONS = [
+  "夜尿症で相談中",
+  "昼間尿失禁・排尿相談中",
+  "発達について相談中",
+  "療育・発達支援を利用中",
+  "他院に通院中の病気がある",
+  "他院で長く飲んでいる薬がある",
+  "早産・低出生体重・NICU入院歴",
+  "新生児仮死・周産期合併症",
+  "神経・筋疾患",
+  "消化器・肛門疾患または手術歴",
+  "泌尿器科通院中",
+  "園・学校で排便やトイレ配慮あり",
+];
+
+const BACKGROUND_STATUS_OPTIONS = ["継続中", "過去にあり", "終了", "不明"];
+
 const SHEET_DEFINITIONS = [
-  { name: SHEET_NAMES.patients, headers: PATIENTS_HEADERS, widths: [110, 90, 105, 160, 260, 120], plainTextHeaders: ["patient_id"], dateHeaders: ["birth_date"] },
+  { name: SHEET_NAMES.patients, headers: PATIENTS_HEADERS, widths: [110, 90, 105, 160, 260, 120, 360, 320, 110, 145], plainTextHeaders: ["patient_id"], dateHeaders: ["birth_date", "background_updated_at"] },
   {
     name: SHEET_NAMES.visits,
     headers: VISITS_HEADERS,
@@ -300,6 +321,10 @@ function savePatientProfile_(params) {
   const savedAt = new Date().toISOString();
   const birthDate = normalizeBirthDate_(params.birth_date);
   const note = String(params.patient_note || "").trim();
+  const backgroundHistory = String(params.background_history || "").trim();
+  const backgroundFlags = normalizeBackgroundFlags_(params.background_flags);
+  const backgroundStatus = normalizeBackgroundStatus_(params.background_status);
+  const backgroundUpdatedAt = normalizeOptionalDate_(params.background_updated_at);
   const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
   const existingRow = findPatientRow_(sheet, patientId);
 
@@ -307,6 +332,10 @@ function savePatientProfile_(params) {
     sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
     sheet.getRange(existingRow, 5).setValue(note);
     sheet.getRange(existingRow, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
+    sheet.getRange(existingRow, 7).setValue(backgroundHistory);
+    sheet.getRange(existingRow, 8).setValue(backgroundFlags.join("、"));
+    sheet.getRange(existingRow, 9).setValue(backgroundStatus);
+    sheet.getRange(existingRow, 10).setNumberFormat("yyyy-mm-dd").setValue(backgroundUpdatedAt);
     return { ok: true, created: false };
   }
 
@@ -317,10 +346,15 @@ function savePatientProfile_(params) {
     savedAt,
     note,
     birthDate,
+    backgroundHistory,
+    backgroundFlags.join("、"),
+    backgroundStatus,
+    backgroundUpdatedAt,
   ]);
   const row = sheet.getLastRow();
   sheet.getRange(row, 1).setNumberFormat("@").setValue(patientId);
   sheet.getRange(row, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
+  sheet.getRange(row, 10).setNumberFormat("yyyy-mm-dd").setValue(backgroundUpdatedAt);
   return { ok: true, created: true };
 }
 
@@ -350,6 +384,10 @@ function upsertPatient_(patientId, createdAt, ageYears, ageMonths) {
     ageOrBlank_(ageYears, 18),
     ageOrBlank_(ageMonths, 11),
     createdAt,
+    "",
+    "",
+    "",
+    "",
     "",
     "",
   ]);
@@ -554,6 +592,28 @@ function normalizeBirthDate_(value) {
   return text;
 }
 
+function normalizeOptionalDate_(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error("日付は yyyy-mm-dd 形式で入力してください。");
+  const date = parseDateOnly_(text);
+  if (!date || date.toISOString().slice(0, 10) !== text) throw new Error("日付を確認してください。");
+  return text;
+}
+
+function normalizeBackgroundFlags_(value) {
+  const values = Array.isArray(value) ? value : String(value || "").split(/[、,\n]/);
+  const allowed = new Set(BACKGROUND_FLAG_OPTIONS);
+  return values
+    .map((item) => String(item || "").trim())
+    .filter((item, index, array) => item && allowed.has(item) && array.indexOf(item) === index);
+}
+
+function normalizeBackgroundStatus_(value) {
+  const text = String(value || "").trim();
+  return BACKGROUND_STATUS_OPTIONS.includes(text) ? text : "";
+}
+
 function addDays_(dateText, days) {
   if (!dateText) return "";
   const date = new Date(`${dateText}T00:00:00Z`);
@@ -604,6 +664,11 @@ function generateHistoryContextSections_(history) {
     `患者ID: ${history.patient_id}`,
     `年齢: ${history.age_text}`,
     `年齢プロファイル: ${history.age_profile}（${history.age_profile_label}）`,
+    `基礎疾患・既往歴: ${cellText_(history.patient && history.patient.background_history)}`,
+    `基礎疾患・併存相談チェック: ${cellText_(history.patient && history.patient.background_flags)}`,
+    `基礎疾患・併存相談の状態: ${cellText_(history.patient && history.patient.background_status)}`,
+    `基礎疾患・併存相談の最終確認日: ${cellText_(displayValueForKey_("background_updated_at", history.patient && history.patient.background_updated_at))}`,
+    `台帳メモ: ${cellText_(history.patient && history.patient.note)}`,
     `対象履歴: 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件`,
     "",
     "【受診・問診履歴】",
@@ -731,6 +796,16 @@ function generateDoctorHistoryHtml(params) {
       <h1>便秘履歴</h1>
       <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(history.age_text)} / 年齢プロファイル: ${escapeHtml_(history.age_profile_label)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
       <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(profileUrl)}">患者台帳を開く</a> / <a href="${escapeHtml_(preVisitContextUrl)}" target="_blank" rel="noreferrer">ChatGPT診察前整理を開く</a> / <a href="${escapeHtml_(treatmentContextUrl)}" target="_blank" rel="noreferrer">ChatGPT治療方針検討を開く</a></p>
+      <section class="panel">
+        <h2>患者基本情報</h2>
+        <div class="grid">
+          ${htmlItem_("基礎疾患・既往歴", history.patient && history.patient.background_history, "meta")}
+          ${htmlItem_("基礎疾患・併存相談チェック", history.patient && history.patient.background_flags, "meta")}
+          ${htmlItem_("状態", history.patient && history.patient.background_status, "meta")}
+          ${htmlItem_("最終確認日", displayValueForKey_("background_updated_at", history.patient && history.patient.background_updated_at), "meta")}
+          ${htmlItem_("台帳メモ", history.patient && history.patient.note, "meta")}
+        </div>
+      </section>
       <details>
         <summary>ChatGPT診察前整理テキストをページ内で表示</summary>
         <div class="copy-row">
@@ -798,6 +873,7 @@ function getPatientProfileData(params) {
   const referenceDate = dateTimeInScriptTimezone_(new Date());
   const patient = getPatient_(patientId);
   const ageProfile = patientAgeProfile_(patient, referenceDate);
+  const backgroundSummary = patientBackgroundSummary_(patient);
   return {
     ok: true,
     patient_id: patientId,
@@ -805,7 +881,24 @@ function getPatientProfileData(params) {
     age_profile: ageProfile,
     age_profile_label: ageProfileLabel_(ageProfile),
     questionnaire_version: normalizeQuestionnaireVersion_("", ageProfile),
+    background_summary: backgroundSummary,
+    background_flags: normalizeBackgroundFlags_(patient.background_flags),
+    background_status: String(patient.background_status || ""),
+    background_updated_at: dateInputValue_(patient.background_updated_at),
+    has_background_context: Boolean(backgroundSummary),
   };
+}
+
+function patientBackgroundSummary_(patient) {
+  if (!patient) return "";
+  const parts = [];
+  const flags = normalizeBackgroundFlags_(patient.background_flags);
+  if (flags.length) parts.push(flags.join("、"));
+  if (patient.background_status) parts.push(`状態: ${patient.background_status}`);
+  const updatedAt = dateInputValue_(patient.background_updated_at);
+  if (updatedAt) parts.push(`最終確認: ${updatedAt}`);
+  if (patient.background_history) parts.push(`補足: ${patient.background_history}`);
+  return parts.join(" / ");
 }
 
 function patientAgeText_(patient, referenceDateValue) {
@@ -1025,7 +1118,7 @@ function generateDoctorEntryHtml(params) {
       .notice.saving { border-color: #d6a740; background: #fff7df; color: #7a4d00; }
       .notice.error { border-color: #d8a1a1; background: #fdecec; color: #8a2d2d; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-      label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
+      label, .field-label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
       input, textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; }
       textarea { min-height: 88px; resize: vertical; }
       .wide { grid-column: 1 / -1; }
@@ -1219,6 +1312,17 @@ function generatePatientProfileHtml(params) {
   const historyUrl = buildSelfUrl_("doctorHistory", patientId, normalizeLimit_(params.limit, 5));
   const entryUrl = buildSelfUrl_("doctorEntry", patientId, normalizeLimit_(params.limit, 5));
   const birthDateValue = dateInputValue_(patient.birth_date);
+  const backgroundFlags = normalizeBackgroundFlags_(patient.background_flags);
+  const backgroundUpdatedAtValue = dateInputValue_(patient.background_updated_at);
+  const backgroundFlagInputs = BACKGROUND_FLAG_OPTIONS.map((option) => `
+              <label class="checkbox-option">
+                <input name="background_flags" type="checkbox" value="${escapeHtml_(option)}" ${backgroundFlags.includes(option) ? "checked" : ""}>
+                <span>${escapeHtml_(option)}</span>
+              </label>`).join("");
+  const backgroundStatusOptions = ["", ...BACKGROUND_STATUS_OPTIONS].map((option) => {
+    const label = option || "未選択";
+    return `<option value="${escapeHtml_(option)}" ${String(patient.background_status || "") === option ? "selected" : ""}>${escapeHtml_(label)}</option>`;
+  }).join("");
   return `
 <!doctype html>
 <html lang="ja">
@@ -1239,10 +1343,13 @@ function generatePatientProfileHtml(params) {
       .notice.saving { border-color: #d6a740; background: #fff7df; color: #7a4d00; }
       .notice.error { border-color: #d8a1a1; background: #fdecec; color: #8a2d2d; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-      label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
-      input, textarea { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; }
+      label, .field-label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
+      input, textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; background: #fff; }
       textarea { min-height: 110px; resize: vertical; }
       .wide { grid-column: 1 / -1; }
+      .checkbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .checkbox-option { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; color: #20242a; font-weight: 600; line-height: 1.45; }
+      .checkbox-option input { width: auto; min-height: auto; margin-top: 3px; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
       button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
       button:disabled { cursor: wait; opacity: .62; }
@@ -1272,11 +1379,27 @@ function generatePatientProfileHtml(params) {
             <label>年齢プロファイル
               <input type="text" value="${escapeHtml_(history.age_profile_label)}" readonly>
             </label>
+            <label class="wide">基礎疾患・既往歴
+              <textarea name="background_history" placeholder="例: 重症新生児仮死でNICU入院歴あり。極低出生体重児。出生時から便秘。">${escapeHtml_(patient.background_history || "")}</textarea>
+            </label>
+            <div class="field-label wide">基礎疾患・併存相談チェック
+              <div class="checkbox-grid">
+                ${backgroundFlagInputs}
+              </div>
+            </div>
+            <label>状態
+              <select name="background_status">
+                ${backgroundStatusOptions}
+              </select>
+            </label>
+            <label>最終確認日
+              <input name="background_updated_at" type="date" value="${escapeHtml_(backgroundUpdatedAtValue)}">
+            </label>
             <label class="wide">台帳メモ
               <textarea name="patient_note" placeholder="例: 年齢確認済み、家族からの補足など">${escapeHtml_(patient.note || "")}</textarea>
             </label>
           </div>
-          <p class="help">生年月日は患者向けURL、QR、ChatGPT貼り付け用テキストには直接出さず、医師側の年齢表示にだけ使います。</p>
+          <p class="help">生年月日は患者向けURL、QR、ChatGPT貼り付け用テキストには直接出さず、医師側の年齢表示にだけ使います。基礎疾患・既往歴は医師側履歴とChatGPT貼り付け用テキストに反映します。</p>
         </section>
         <div class="actions">
           <button type="button" id="savePatientProfileButton">患者台帳を保存</button>
@@ -1307,7 +1430,13 @@ function generatePatientProfileHtml(params) {
       function formObject() {
         const data = {};
         new FormData(form).forEach((value, key) => {
-          data[key] = value;
+          if (data[key] === undefined) {
+            data[key] = value;
+          } else if (Array.isArray(data[key])) {
+            data[key].push(value);
+          } else {
+            data[key] = [data[key], value];
+          }
         });
         return data;
       }
@@ -1544,7 +1673,7 @@ function cellText_(value) {
 function displayValueForKey_(key, value) {
   if (value === "" || value === null || value === undefined) return "";
   if (["date", "submitted_at", "saved_at"].includes(key)) return displayDateTime_(value);
-  if (["period_start", "period_end", "birth_date"].includes(key)) return displayDate_(value);
+  if (["period_start", "period_end", "birth_date", "background_updated_at"].includes(key)) return displayDate_(value);
   const dayCountKeys = [
     "recorded_days",
     "bowel_days",

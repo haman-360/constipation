@@ -421,6 +421,7 @@
   ];
 
   const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at", "age_years", "age_months", "age_profile", "questionnaire_version"];
+  const PATIENT_CONTEXT_FIELD_IDS = ["patient_background_registered", "patient_background_change_note", "patient_background_skip_urinary"];
 
   const TODDLER_QUESTIONNAIRE_FIELD_IDS = [...BASIC_IDS, "q6_med_adherence_flags", ...ADDITIONAL_ORDER];
   const QUESTIONNAIRE_FIELD_IDS = [...TODDLER_QUESTIONNAIRE_FIELD_IDS, ...INFANT_BASIC_IDS, ...INFANT_CONDITIONAL_IDS, ...CHILD_BASIC_IDS, ...CHILD_CONDITIONAL_IDS];
@@ -474,8 +475,19 @@
 
   function visibleChildFieldIds(data) {
     const ids = [...CHILD_BASIC_IDS];
+    if (data.patient_background_registered) {
+      const backgroundIndex = ids.indexOf("c11_background");
+      if (backgroundIndex !== -1) ids.splice(backgroundIndex, 1);
+    }
+    if (data.patient_background_skip_urinary) {
+      const urinaryIndex = ids.indexOf("c7_urinary");
+      if (urinaryIndex !== -1) ids.splice(urinaryIndex, 1);
+    }
     const med = asArray(data.c10_med_status);
-    if (med.some((item) => item !== "便秘薬は使っていない")) ids.splice(ids.indexOf("c11_background"), 0, "c10_med_note");
+    if (med.some((item) => item !== "便秘薬は使っていない")) {
+      const insertBefore = ids.indexOf("c11_background") === -1 ? ids.indexOf("c12_concerns") : ids.indexOf("c11_background");
+      ids.splice(insertBefore === -1 ? ids.length : insertBefore, 0, "c10_med_note");
+    }
     const background = asArray(data.c11_background);
     if (background.some((item) => item !== "特にない" && item !== "答えたくない、または今はわからない")) ids.splice(ids.indexOf("c12_concerns"), 0, "c11_background_note");
     return ids;
@@ -550,6 +562,9 @@
     const visible = new Set(visibleFieldIds(data));
     const next = {};
     VISIT_META_FIELD_IDS.forEach((id) => {
+      if (data && data[id] !== undefined) next[id] = data[id];
+    });
+    PATIENT_CONTEXT_FIELD_IDS.forEach((id) => {
       if (data && data[id] !== undefined) next[id] = data[id];
     });
     profileQuestionnaireIds(data && data.age_profile).forEach((id) => {
@@ -757,6 +772,8 @@
       if (hasAnyValue(data, ["c7_urinary"], ["夜尿がある", "昼間に尿もれがある（昼間尿失禁）", "トイレが近い", "尿を我慢することが多い"])) items.push("夜尿・昼間尿失禁・排尿習慣は便秘との関係を決めつけず背景情報として確認。");
       if (hasAnyValue(data, ["c10_med_status", "c12_concerns"], ["ときどき忘れる", "少なめに飲んでいる", "多めに飲んでいる", "飲みにくくて困る", "最近やめた", "保護者が薬を続けることを不安に思っている", "保護者が薬を減らすことを不安に思っている", "便秘になるのが不安で薬をやめられない"])) items.push("服薬継続、自己調整、中止、不安を分けて診察で確認。");
       if (hasAnyValue(data, ["c11_background"], ["発達について相談中", "他院に通院中の病気がある", "他院で長く飲んでいる薬がある", "遺伝性疾患などを指摘されたことがある"])) items.push("発達相談、他院通院、他院処方は便秘との関係を断定せず背景情報として確認。");
+      if (data.patient_background_registered) items.push("登録済みの基礎疾患・併存相談を前提に、変更有無と便秘経過への影響を診察で確認。");
+      if (data.patient_background_change_note) items.push("患者・保護者から背景情報の変更補足あり。台帳更新が必要か確認。");
       if (!items.length) items.push("4歳以降として、園・学校での排便、便失禁、生活リズム、本人と保護者の困りごとを確認。");
       return items;
     }
@@ -792,12 +809,17 @@
         raw: data,
       };
     }
+    const childSafetyIds = ["c6_school_toilet", ...(data.patient_background_skip_urinary ? [] : ["c7_urinary"]), "c8_abdominal_symptom"];
     return {
       urgency: { level: "watch", label: "診察で確認", message: "4歳以降として診察時に確認したい情報があります。" },
       headline: profileHeadline(data),
       stool: profileReviewRows(data, ["c1_last_bowel_movement", "c2_stool_consistency", "c3_pain_problem", "c4_withholding", "c5_soiling"]),
-      safety: profileReviewRows(data, ["c6_school_toilet", "c7_urinary", "c8_abdominal_symptom"]),
-      stoolConcerns: profileReviewRows(data, ["c9_lifestyle", "c11_background", "c12_concerns"]),
+      safety: profileReviewRows(data, childSafetyIds),
+      stoolConcerns: [
+        ...profileReviewRows(data, ["c9_lifestyle", "c11_background", "c12_concerns"]),
+        ...(data.patient_background_registered ? [{ label: "登録済み背景情報", value: data.patient_background_registered }] : []),
+        ...(data.patient_background_change_note ? [{ label: "背景情報の変更補足", value: data.patient_background_change_note }] : []),
+      ],
       medication: profileReviewRows(data, ["c10_med_status", "c10_med_note"]),
       diary: diaryRows(data),
       weeklySummary: weeklySummary(data),
@@ -821,6 +843,10 @@
 年齢: ${ageText(data)}
 年齢プロファイル: ${profileDisplayName(profile)}
 質問セット: ${questionnaireVersionForProfile(profile)}
+
+登録済み背景情報:
+${data.patient_background_registered ? `- ${data.patient_background_registered}` : "- 未登録または未取得"}
+${data.patient_background_change_note ? `- 変更・追加補足: ${data.patient_background_change_note}` : ""}
 
 問診回答:
 ${answers}
@@ -1243,7 +1269,7 @@ ${diarySection}
       age_months: data.age_months === undefined ? "" : data.age_months,
       age_profile: normalizeAgeProfile(data.age_profile),
       questionnaire_version: data.questionnaire_version || questionnaireVersionForProfile(data.age_profile),
-      questionnaire: pickDefined(data, profileQuestionnaireIds(data.age_profile)),
+      questionnaire: pickDefined(data, [...profileQuestionnaireIds(data.age_profile), ...PATIENT_CONTEXT_FIELD_IDS]),
       diary: pickDefined(data, DIARY_FIELD_IDS),
       outputs: {
         urgency_level: review.urgency.level,

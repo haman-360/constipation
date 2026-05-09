@@ -10,7 +10,7 @@
 - 現在の処方と内服状況
 - トイレトレーニング状況
 - 直近1-4週の日誌または聞き取り要約
-- 生年月日と医師用メモ
+- 生年月日、基礎疾患・既往歴、医師用メモ
 
 ## ファイル
 
@@ -48,7 +48,7 @@
 
 既存患者さんを短時間で登録する場合は、最低限これだけで十分実用になります。
 
-- `patients`: `patient_id`, `birth_date`, `note`
+- `patients`: `patient_id`, `birth_date`, `background_history`, `background_flags`, `background_status`, `background_updated_at`, `note`
 - `prescriptions`: `patient_id`, `date`, `medicine_name`, `dose`, `instruction`, `doctor_note`
 - `toilet_training`: `patient_id`, `date`, `training_status`, `diaper_status`, `toilet_refusal`, `note`
 - `diary_weekly`: `patient_id`, `period_start`, `period_end`, `bowel_days`, `longest_no_bowel_days`, `hard_days`, `pain_days`, `withholding_days`, `med_taken_days`, `note`

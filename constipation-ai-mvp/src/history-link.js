@@ -26,7 +26,7 @@ const els = {
 const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
 
 function sanitizePatientId(value) {
-  return String(value || "").replace(/\D/g, "").slice(0, 5);
+  return String(value || "").normalize("NFKC").replace(/\D/g, "").slice(0, 5);
 }
 
 function normalizeLimit(value) {

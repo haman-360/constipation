@@ -26,7 +26,7 @@ function defaultBaseUrl() {
 }
 
 function sanitizePatientId(value) {
-  return String(value || "").replace(/\D/g, "").slice(0, 5);
+  return String(value || "").normalize("NFKC").replace(/\D/g, "").slice(0, 5);
 }
 
 function sanitizeToken(value) {

@@ -17,7 +17,7 @@
         <div class="link-tool__grid">
           <label class="link-field">
             <span>患者ID（5桁）</span>
-            <input id="patientIdInput" type="text" inputmode="numeric" maxlength="5" placeholder="例: 00100" />
+            <input id="patientIdInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="例: 00100" />
           </label>
           <label class="link-field link-field--readonly">
             <span>来院トークン</span>
@@ -61,6 +61,6 @@
       </section>
     </main>
 
-    <script src="./src/visit-link.js?v=20260503-4"></script>
+    <script src="./src/visit-link.js?v=20260511-1"></script>
   </body>
 </html>

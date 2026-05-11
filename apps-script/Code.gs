@@ -131,6 +131,12 @@ const BACKGROUND_FLAG_ALIASES = {
   "ヒルシュスプルング病評価歴あり": "小児外科紹介・受診歴あり",
 };
 const BACKGROUND_STATUS_OPTIONS = ["継続中", "過去にあり", "終了", "不明"];
+const MEDICINE_DOSE_PRESETS = [
+  { name: "モビコール", unit: "包/日" },
+  { name: "酸化マグネシウム", unit: "g/日" },
+  { name: "ピコスルファート", unit: "滴 頓用" },
+  { name: "グリセリン浣腸", unit: "本 頓用" },
+];
 
 const SHEET_DEFINITIONS = [
   { name: SHEET_NAMES.patients, headers: PATIENTS_HEADERS, widths: [110, 90, 105, 160, 260, 120, 360, 320, 110, 145], plainTextHeaders: ["patient_id"], dateHeaders: ["birth_date", "background_updated_at"] },
@@ -265,19 +271,22 @@ function savePrescription_(params) {
   const patientId = requirePatientId_(params.patient_id);
   const savedAt = new Date().toISOString();
   const date = dateTimeInScriptTimezone_(params.prescription_date || params.date || savedAt);
-  const medicineName = String(params.medicine_name || "").trim();
-  if (!medicineName) throw new Error("薬剤名を入力してください。");
+  const entries = prescriptionEntriesFromParams_(params);
+  if (!entries.length) throw new Error("薬剤名を入力してください。");
   upsertPatient_(patientId, savedAt);
   const sheet = getOrCreateSheet_(SHEET_NAMES.prescriptions, PRESCRIPTIONS_HEADERS);
-  sheet.appendRow([
-    params.prescription_id || generateRowId_("RX", patientId, date),
-    patientId,
-    date,
-    medicineName,
-    String(params.dose || "").trim(),
-    String(params.instruction || "").trim(),
-    String(params.doctor_note || "").trim(),
-  ]);
+  entries.forEach((entry, index) => {
+    sheet.appendRow([
+      entry.prescription_id || params.prescription_id || generateRowId_("RX", patientId, `${date}-${index + 1}`),
+      patientId,
+      date,
+      entry.medicine_name,
+      entry.dose,
+      String(params.instruction || "").trim(),
+      String(params.doctor_note || "").trim(),
+    ]);
+  });
+  return entries.length;
 }
 
 function saveToiletTraining_(params) {
@@ -312,8 +321,8 @@ function saveDoctorEntries_(params) {
 }
 
 function savePrescriptionFromDoctorForm(formObject) {
-  savePrescription_(formObject || {});
-  return { ok: true, message: "処方履歴を保存しました。", saved_sections: ["prescription"] };
+  const count = savePrescription_(formObject || {});
+  return { ok: true, message: `処方履歴を${count}件保存しました。`, saved_sections: ["prescription"] };
 }
 
 function saveToiletTrainingFromDoctorForm(formObject) {
@@ -378,7 +387,50 @@ function savePatientProfileFromForm(formObject) {
 }
 
 function hasPrescriptionInput_(params) {
-  return ["medicine_name", "dose", "instruction", "doctor_note"].some((key) => String(params[key] || "").trim());
+  if (["medicine_name", "dose", "instruction", "doctor_note"].some((key) => String(params[key] || "").trim())) return true;
+  for (let index = 0; index < 5; index += 1) {
+    if ([
+      `medicine_name_${index}`,
+      `dose_amount_${index}`,
+      `dose_unit_${index}`,
+      `dose_${index}`,
+    ].some((key) => String(params[key] || "").trim())) return true;
+  }
+  return false;
+}
+
+function prescriptionEntriesFromParams_(params) {
+  const entries = [];
+  for (let index = 0; index < 5; index += 1) {
+    const medicineName = String(params[`medicine_name_${index}`] || "").trim();
+    const dose = prescriptionDoseText_(params[`dose_amount_${index}`], params[`dose_unit_${index}`], params[`dose_${index}`]);
+    if (!medicineName && !dose) continue;
+    if (!medicineName) throw new Error(`薬剤名を入力してください（${index + 1}行目）。`);
+    entries.push({
+      medicine_name: medicineName,
+      dose,
+      prescription_id: String(params[`prescription_id_${index}`] || "").trim(),
+    });
+  }
+
+  if (entries.length) return entries;
+  const medicineName = String(params.medicine_name || "").trim();
+  if (!medicineName && !String(params.dose || "").trim()) return [];
+  if (!medicineName) throw new Error("薬剤名を入力してください。");
+  return [{
+    medicine_name: medicineName,
+    dose: String(params.dose || "").trim(),
+    prescription_id: String(params.prescription_id || "").trim(),
+  }];
+}
+
+function prescriptionDoseText_(amountValue, unitValue, fallbackValue) {
+  const fallback = String(fallbackValue || "").trim();
+  const amount = String(amountValue || "").trim();
+  const unit = String(unitValue || "").trim();
+  if (!amount && !unit) return fallback;
+  if (amount && /^[A-Za-z]/.test(unit)) return `${amount} ${unit}`;
+  return [amount, unit].filter(Boolean).join("");
 }
 
 function hasToiletTrainingInput_(params) {
@@ -1170,6 +1222,20 @@ function generateDoctorEntryHtml(params) {
   const formAction = serviceUrl_();
   const historyUrl = buildSelfUrl_("doctorHistory", patientId, normalizeLimit_(params.limit, 5));
   const profileUrl = buildSelfUrl_("patientProfile", patientId, normalizeLimit_(params.limit, 5));
+  const medicinePresetJson = JSON.stringify(MEDICINE_DOSE_PRESETS);
+  const medicineOptionsHtml = MEDICINE_DOSE_PRESETS.map((preset) => `<option value="${escapeHtml_(preset.name)}"></option>`).join("");
+  const medicineRowsHtml = [0, 1, 2].map((index) => `
+              <div class="medicine-row" data-medicine-row>
+                <label>薬剤名
+                  <input name="medicine_name_${index}" type="text" list="medicineNameList" data-medicine-name placeholder="${index === 0 ? "例: モビコール" : "薬剤を追加"}">
+                </label>
+                <label>量
+                  <input name="dose_amount_${index}" type="text" inputmode="decimal" data-dose-amount placeholder="${index === 0 ? "例: 1" : ""}">
+                </label>
+                <label>単位・用法
+                  <input name="dose_unit_${index}" type="text" data-dose-unit placeholder="${index === 0 ? "例: 包/日" : ""}">
+                </label>
+              </div>`).join("");
   return `
 <!doctype html>
 <html lang="ja">
@@ -1196,12 +1262,15 @@ function generateDoctorEntryHtml(params) {
       input, textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; }
       textarea { min-height: 88px; resize: vertical; }
       .wide { grid-column: 1 / -1; }
+      .medicine-list { grid-column: 1 / -1; display: grid; gap: 10px; }
+      .medicine-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(90px, .7fr) minmax(130px, 1fr); gap: 10px; padding: 12px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
+      .field-help { margin: 4px 0 0; color: #5d6673; font-size: .9rem; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
       button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
       button.secondary { border: 1px solid #d9e0e8; background: #fff; color: #20242a; }
       button:disabled { cursor: wait; opacity: .62; }
       a { color: #07576b; font-weight: 800; }
-      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+      @media (max-width: 700px) { .grid, .medicine-row { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
@@ -1219,12 +1288,12 @@ function generateDoctorEntryHtml(params) {
             <label>処方日時
               <input name="prescription_date" type="datetime-local" value="${escapeHtml_(nowValue)}">
             </label>
-            <label>薬剤名
-              <input name="medicine_name" type="text" placeholder="例: モビコール">
-            </label>
-            <label>量
-              <input name="dose" type="text" placeholder="例: 1包/日">
-            </label>
+            <div></div>
+            <div class="medicine-list">
+              <datalist id="medicineNameList">${medicineOptionsHtml}</datalist>
+${medicineRowsHtml}
+              <p class="field-help">薬剤名を選ぶと単位・用法を自動入力します。リスト外の薬剤や単位も直接入力できます。</p>
+            </div>
             <label class="wide">指示内容
               <textarea name="instruction" placeholder="例: 便の様子を見ながら医師指示範囲で調整"></textarea>
             </label>
@@ -1284,6 +1353,7 @@ function generateDoctorEntryHtml(params) {
       const form = document.getElementById("doctorEntryForm");
       const message = document.getElementById("saveMessage");
       const buttons = Array.from(document.querySelectorAll("[data-save-action]"));
+      const medicinePresets = ${medicinePresetJson};
       const handlers = {
         both: "saveDoctorEntriesFromDoctorForm",
         prescription: "savePrescriptionFromDoctorForm",
@@ -1336,8 +1406,13 @@ function generateDoctorEntryHtml(params) {
       }
 
       function clearPrescriptionFields() {
-        ["medicine_name", "dose", "instruction", "doctor_note"].forEach((name) => {
+        ["instruction", "doctor_note"].forEach((name) => {
           if (form.elements[name]) form.elements[name].value = "";
+        });
+        document.querySelectorAll("[data-medicine-row]").forEach((row) => {
+          row.querySelectorAll("input").forEach((input) => {
+            input.value = "";
+          });
         });
         setCurrentDateTime("prescription_date");
       }
@@ -1352,6 +1427,18 @@ function generateDoctorEntryHtml(params) {
       function clearSavedSections(savedSections) {
         if (savedSections.includes("prescription")) clearPrescriptionFields();
         if (savedSections.includes("toiletTraining")) clearToiletTrainingFields();
+      }
+
+      function setupMedicineRows() {
+        document.querySelectorAll("[data-medicine-row]").forEach((row) => {
+          const nameInput = row.querySelector("[data-medicine-name]");
+          const unitInput = row.querySelector("[data-dose-unit]");
+          if (!nameInput || !unitInput) return;
+          nameInput.addEventListener("input", () => {
+            const preset = medicinePresets.find((item) => item.name === nameInput.value.trim());
+            if (preset && !unitInput.value.trim()) unitInput.value = preset.unit;
+          });
+        });
       }
 
       buttons.forEach((button) => {
@@ -1373,6 +1460,7 @@ function generateDoctorEntryHtml(params) {
             })[handlerName](formObject());
         });
       });
+      setupMedicineRows();
     </script>
   </body>
 </html>`;

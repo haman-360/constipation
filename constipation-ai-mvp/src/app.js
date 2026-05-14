@@ -210,7 +210,7 @@ function renderDiaryForm() {
     <section class="diary-link" aria-label="直近日誌">
       <div class="diary-link__header">
         <h2>直近日誌がある場合</h2>
-        <p>空欄のままでも送信できます。入力した内容だけ診察前サマリーに追加します。</p>
+        <p>空欄のままでも次へ進めます。入力した内容だけ診察前サマリーに追加します。</p>
       </div>
       <div class="diary-grid">
         ${renderDiaryField("diary_days_recorded", "記録日数", "日")}
@@ -448,14 +448,14 @@ function renderFinish() {
   els.progress.hidden = true;
   els.nav.hidden = false;
   els.backButton.disabled = false;
-  els.nextButton.textContent = "送信する";
+  els.nextButton.textContent = "院内保存へ進む";
   els.nextButton.disabled = false;
   setDoctorPanelVisible(false);
   els.screen.innerHTML = `
     <div class="finish">
-      <h1>入力ありがとうございました</h1>
-      <p>回答内容を診察前の確認用にまとめます。</p>
-      <p>薬の量や治療方針は、診察で医師が確認します。</p>
+      <h1>直近日誌を追加できます</h1>
+      <p>日誌がない場合やわからない場合は、何も入力せず下の「院内保存へ進む」を押してください。</p>
+      <p>次の画面で院内保存を行います。保存完了の表示が出るまで、この画面を閉じずにお待ちください。</p>
       ${renderDiaryForm()}
     </div>
   `;

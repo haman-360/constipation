@@ -177,3 +177,13 @@
 - [x] 問診HTMLの置き場所を決める
 - [x] 実患者データを入れる前のテスト患者運用手順を1枚にまとめる
 - [x] GitHubへ今回の変更をcommitする
+
+---
+
+## 開発管理
+
+- [x] `PROJECT.md` / `TODO.md` / `DEVLOG.md` の役割を定義する
+- [x] 初期版 `DEVLOG.md` に現在の設計意図を記録する
+- [x] commit message の基本接頭辞を `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` に統一する
+- [ ] 大きな修正時は `DEVLOG.md` に理由を追記する
+- [ ] 未完了作業や確認待ちは `TODO.md` に反映する

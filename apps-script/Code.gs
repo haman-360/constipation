@@ -1762,6 +1762,9 @@ function htmlItem_(label, value, forcedLevel) {
 function itemImportanceLevel_(label, value) {
   const text = cellText_(value);
   if (text === "未記録" || text === "未確認" || text === "なし") return "missing";
+  if (/(今日|昨日|1日1回|痛がらない|ない|特にない|行ける|普通|やわらかい|先生に言われた量で飲んでいる|便秘薬は使っていない)/.test(text)) {
+    return "good";
+  }
   const combined = `${label} ${text}`;
 
   if (/(4日以上|強く痛がる|泣く|とても嫌がる|血|嘔吐|吐|食欲低下|ぐったり|腹部膨満|おなかが張|週1回以上ある|毎日ある|水のよう|水っぽい|下痢|トイレが詰まりそう)/.test(combined)) {
@@ -1769,9 +1772,6 @@ function itemImportanceLevel_(label, value) {
   }
   if (/(2-3日前|2-3日に1回|硬い|コロコロ|とても大きい|痛|嫌がる|がまん|我慢|回避|便失禁|下着汚れ|便もれ|行きたいけれど|先生に言いにくい|ときどきある|飲みにく|忘れる|少なめ|中止|困っている|不安|学校や園で困っている|夜尿|おなかが痛い|水分が少ない|朝の時間がなく)/.test(combined)) {
     return "check";
-  }
-  if (/(今日|昨日|1日1回|痛がらない|ない|特にない|行ける|普通|やわらかい|先生に言われた量で飲んでいる|便秘薬は使っていない)/.test(combined)) {
-    return "good";
   }
   return "meta";
 }

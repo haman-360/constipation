@@ -133,6 +133,7 @@ const BACKGROUND_FLAG_ALIASES = {
 const BACKGROUND_STATUS_OPTIONS = ["継続中", "過去にあり", "終了", "不明"];
 const MEDICINE_DOSE_PRESETS = [
   { name: "モビコール", unit: "包/日" },
+  { name: "モニラック", unit: "ml/kg/日" },
   { name: "酸化マグネシウム", unit: "g/日" },
   { name: "ピコスルファート", unit: "滴 頓用" },
   { name: "グリセリン浣腸", unit: "本 頓用" },
@@ -1233,7 +1234,7 @@ function generateDoctorEntryHtml(params) {
                   <input name="dose_amount_${index}" type="text" inputmode="decimal" data-dose-amount placeholder="${index === 0 ? "例: 1" : ""}">
                 </label>
                 <label>単位・用法
-                  <input name="dose_unit_${index}" type="text" data-dose-unit placeholder="${index === 0 ? "例: 包/日" : ""}">
+                  <input name="dose_unit_${index}" type="text" data-dose-unit placeholder="${index === 0 ? "例: 包/日、ml/kg/日" : ""}">
                 </label>
               </div>`).join("");
   return `
@@ -1292,13 +1293,15 @@ function generateDoctorEntryHtml(params) {
             <div class="medicine-list">
               <datalist id="medicineNameList">${medicineOptionsHtml}</datalist>
 ${medicineRowsHtml}
-              <p class="field-help">薬剤名を選ぶと単位・用法を自動入力します。リスト外の薬剤や単位も直接入力できます。</p>
+              <p class="field-help">薬剤名を選ぶと単位・用法を自動入力します。例: モニラック 1.7 ml/kg/日。リスト外の薬剤や単位も直接入力できます。</p>
             </div>
             <label class="wide">指示内容
               <textarea name="instruction" placeholder="例: 便の様子を見ながら医師指示範囲で調整"></textarea>
+              <span class="field-help">患者・家族に伝える処方意図や具体的な使い方を記録します。例: 便が硬い間は継続、下痢が続く場合は連絡。</span>
             </label>
             <label class="wide">医師メモ
               <textarea name="doctor_note"></textarea>
+              <span class="field-help">診療側だけで共有したい判断理由、次回確認事項、背景情報を記録します。例: 体重増加より便秘治療を優先、次回食欲と体重を確認。</span>
             </label>
           </div>
         </section>

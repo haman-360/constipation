@@ -17,12 +17,19 @@ const QR_VERSION = 5;
 const QR_SIZE = 17 + QR_VERSION * 4;
 const QR_DATA_CODEWORDS = 108;
 const QR_ECC_CODEWORDS = 26;
+const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
+let lookupRequestId = 0;
+let patientLookup = { patientId: "", status: "idle", exists: false };
 
 function defaultBaseUrl() {
   const url = new URL("./index.html", window.location.href);
   url.search = "";
   url.hash = "";
   return url.toString();
+}
+
+function webAppUrlForLookup() {
+  return localStorage.getItem("constipation_web_app_url") || localStorage.getItem("constipation_submit_url") || DEFAULT_WEB_APP_URL;
 }
 
 function sanitizePatientId(value) {
@@ -57,6 +64,7 @@ function updateOutput() {
   const { patientId, visitToken, url } = buildVisitUrl();
   const ready = Boolean(patientId.length === 5 && visitToken);
   els.copyUrlButton.disabled = !ready;
+  lookupPatientId(patientId);
 
   if (!ready) {
     els.visitUrlOutput.textContent = "患者IDを5桁で入力するとURLを作成します。";
@@ -73,11 +81,45 @@ function updateOutput() {
 
   try {
     els.qrOutput.innerHTML = makeQrSvg(url);
-    els.message.textContent = "";
+    els.message.textContent = patientLookupMessage(patientId);
   } catch (error) {
     els.qrOutput.innerHTML = "";
     els.message.textContent = error.message;
   }
+}
+
+async function lookupPatientId(patientId) {
+  if (patientId.length !== 5) {
+    patientLookup = { patientId, status: "idle", exists: false };
+    return;
+  }
+  if (patientLookup.patientId === patientId) return;
+
+  const requestId = ++lookupRequestId;
+  patientLookup = { patientId, status: "loading", exists: false };
+  try {
+    const url = new URL(webAppUrlForLookup());
+    url.searchParams.set("action", "patientProfileData");
+    url.searchParams.set("patient_id", patientId);
+    const response = await fetch(url.toString(), { method: "GET", mode: "cors" });
+    const result = await response.json();
+    if (requestId !== lookupRequestId) return;
+    if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    patientLookup = { patientId, status: "done", exists: Boolean(result.patient_exists) };
+  } catch (error) {
+    if (requestId !== lookupRequestId) return;
+    patientLookup = { patientId, status: "error", exists: false };
+  }
+  updateOutput();
+}
+
+function patientLookupMessage(patientId) {
+  if (patientLookup.patientId !== patientId) return "";
+  if (patientLookup.status === "loading") return "患者台帳を確認中です。";
+  if (patientLookup.status === "error") return "患者台帳を確認できませんでした。IDを目視で確認してください。";
+  if (patientLookup.exists) return "この患者IDはすでに台帳にあります。再診ならこのまま使えます。別の患者さんの新規登録ならIDを確認してください。";
+  if (patientLookup.status === "done") return "この患者IDは台帳に未登録です。新規患者さんの場合だけ使用してください。";
+  return "";
 }
 
 async function copyUrl() {

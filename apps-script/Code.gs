@@ -352,45 +352,47 @@ function saveDoctorEntriesFromDoctorForm(formObject) {
 }
 
 function savePatientProfile_(params) {
-  const patientId = requirePatientId_(params.patient_id);
-  const savedAt = new Date().toISOString();
-  const birthDate = normalizeBirthDate_(params.birth_date);
-  const note = String(params.patient_note || "").trim();
-  const backgroundHistory = String(params.background_history || "").trim();
-  const backgroundFlags = normalizeBackgroundFlags_(params.background_flags);
-  const backgroundStatus = normalizeBackgroundStatus_(params.background_status);
-  const backgroundUpdatedAt = normalizeOptionalDate_(params.background_updated_at);
-  const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
-  const existingRow = findPatientRow_(sheet, patientId);
+  return withScriptLock_(() => {
+    const patientId = requirePatientId_(params.patient_id);
+    const savedAt = new Date().toISOString();
+    const birthDate = normalizeBirthDate_(params.birth_date);
+    const note = String(params.patient_note || "").trim();
+    const backgroundHistory = String(params.background_history || "").trim();
+    const backgroundFlags = normalizeBackgroundFlags_(params.background_flags);
+    const backgroundStatus = normalizeBackgroundStatus_(params.background_status);
+    const backgroundUpdatedAt = normalizeOptionalDate_(params.background_updated_at);
+    const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
+    const existingRow = findPatientRow_(sheet, patientId);
 
-  if (existingRow) {
-    sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
-    sheet.getRange(existingRow, 5).setValue(note);
-    sheet.getRange(existingRow, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
-    sheet.getRange(existingRow, 7).setValue(backgroundHistory);
-    sheet.getRange(existingRow, 8).setValue(backgroundFlags.join("、"));
-    sheet.getRange(existingRow, 9).setValue(backgroundStatus);
-    sheet.getRange(existingRow, 10).setNumberFormat("yyyy-mm-dd").setValue(backgroundUpdatedAt);
-    return { ok: true, created: false };
-  }
+    if (existingRow) {
+      sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
+      sheet.getRange(existingRow, 5).setValue(note);
+      sheet.getRange(existingRow, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
+      sheet.getRange(existingRow, 7).setValue(backgroundHistory);
+      sheet.getRange(existingRow, 8).setValue(backgroundFlags.join("、"));
+      sheet.getRange(existingRow, 9).setValue(backgroundStatus);
+      sheet.getRange(existingRow, 10).setNumberFormat("yyyy-mm-dd").setValue(backgroundUpdatedAt);
+      return { ok: true, created: false };
+    }
 
-  sheet.appendRow([
-    patientId,
-    "",
-    "",
-    savedAt,
-    note,
-    birthDate,
-    backgroundHistory,
-    backgroundFlags.join("、"),
-    backgroundStatus,
-    backgroundUpdatedAt,
-  ]);
-  const row = sheet.getLastRow();
-  sheet.getRange(row, 1).setNumberFormat("@").setValue(patientId);
-  sheet.getRange(row, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
-  sheet.getRange(row, 10).setNumberFormat("yyyy-mm-dd").setValue(backgroundUpdatedAt);
-  return { ok: true, created: true };
+    sheet.appendRow([
+      patientId,
+      "",
+      "",
+      savedAt,
+      note,
+      birthDate,
+      backgroundHistory,
+      backgroundFlags.join("、"),
+      backgroundStatus,
+      backgroundUpdatedAt,
+    ]);
+    const row = sheet.getLastRow();
+    sheet.getRange(row, 1).setNumberFormat("@").setValue(patientId);
+    sheet.getRange(row, 6).setNumberFormat("yyyy-mm-dd").setValue(birthDate);
+    sheet.getRange(row, 10).setNumberFormat("yyyy-mm-dd").setValue(backgroundUpdatedAt);
+    return { ok: true, created: true };
+  });
 }
 
 function savePatientProfileFromForm(formObject) {
@@ -450,27 +452,29 @@ function hasToiletTrainingInput_(params) {
 }
 
 function upsertPatient_(patientId, createdAt, ageYears, ageMonths) {
-  const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
-  const existingRow = findPatientRow_(sheet, patientId);
-  if (existingRow) {
-    sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
-    updatePatientAgeIfPresent_(sheet, existingRow, ageYears, ageMonths);
-    return false;
-  }
-  sheet.appendRow([
-    patientId,
-    ageOrBlank_(ageYears, 18),
-    ageOrBlank_(ageMonths, 11),
-    createdAt,
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
-  sheet.getRange(sheet.getLastRow(), 1).setNumberFormat("@").setValue(patientId);
-  return true;
+  return withScriptLock_(() => {
+    const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
+    const existingRow = findPatientRow_(sheet, patientId);
+    if (existingRow) {
+      sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
+      updatePatientAgeIfPresent_(sheet, existingRow, ageYears, ageMonths);
+      return false;
+    }
+    sheet.appendRow([
+      patientId,
+      ageOrBlank_(ageYears, 18),
+      ageOrBlank_(ageMonths, 11),
+      createdAt,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ]);
+    sheet.getRange(sheet.getLastRow(), 1).setNumberFormat("@").setValue(patientId);
+    return true;
+  });
 }
 
 function findPatientRow_(sheet, patientId) {
@@ -1100,16 +1104,24 @@ function getPatient_(patientId) {
   return rowsForPatient_(SHEET_NAMES.patients, PATIENTS_HEADERS, patientId)[0] || {};
 }
 
+function patientExists_(patientId) {
+  const sheet = getSpreadsheet_().getSheetByName(SHEET_NAMES.patients);
+  if (!sheet) return false;
+  return Boolean(findPatientRow_(sheet, patientId));
+}
+
 function getPatientProfileData(params) {
   const patientId = requirePatientId_(params.patient_id || params.pid);
   const referenceDate = dateTimeInScriptTimezone_(new Date());
   const patient = getPatient_(patientId);
+  const exists = patientExists_(patientId);
   const ageProfile = patientAgeProfile_(patient, referenceDate);
   const backgroundSummary = patientBackgroundSummary_(patient, { patientFacing: true });
   const backgroundFlags = normalizeBackgroundFlags_(patient.background_flags);
   return {
     ok: true,
     patient_id: patientId,
+    patient_exists: exists,
     age_text: patientAgeText_(patient, referenceDate),
     age_profile: ageProfile,
     age_profile_label: ageProfileLabel_(ageProfile),
@@ -2120,6 +2132,16 @@ function parseJsonBody_(e) {
     throw new Error("JSON body is required.");
   }
   return JSON.parse(e.postData.contents);
+}
+
+function withScriptLock_(callback) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function validateSubmitVisitPayload_(payload) {

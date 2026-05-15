@@ -171,6 +171,9 @@ function doGet(e) {
     if (action === "chatGPTContext") {
       return textResponse_(generateChatGPTContext(e.parameter || {}));
     }
+    if (action === "emrText") {
+      return textResponse_(generateEmrText(e.parameter || {}));
+    }
     if (action === "doctorHistory") {
       return htmlResponse_(generateDoctorHistoryHtml(e.parameter || {}));
     }
@@ -745,6 +748,72 @@ function generateChatGPTContext(params) {
   return generatePreVisitContext_(history);
 }
 
+function generateEmrText(params) {
+  const history = getPatientHistory(params);
+  return generateEmrTextFromHistory_(history, params.doctor_note || "");
+}
+
+function generateEmrTextFromHistory_(history, doctorMemo) {
+  const latestVisit = history.visits[0];
+  if (!latestVisit) return "便秘問診: 本日の問診記録なし。";
+  const memo = String(doctorMemo || latestVisit.doctor_note || "").trim();
+  return [
+    generateEmrBaseTextFromHistory_(history),
+    memo ? `医師メモ: ${memo}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function generateEmrBaseTextFromHistory_(history) {
+  const latestVisit = history.visits[0];
+  if (!latestVisit) return "便秘問診: 本日の問診記録なし。";
+  return `便秘問診: ${emrVisitSentence_(latestVisit)}`;
+}
+
+function emrVisitSentence_(visit) {
+  const profile = normalizeAgeProfile_(visit.age_profile);
+  const questionnaire = visit.questionnaire || {};
+  const diaryText = emrDiarySentence_(visit.diary || {});
+  if (profile === "infant") {
+    return [
+      `最終排便は${emrQuestionnaireText_(questionnaire, ["i1_last_bowel_movement", "q1_last_bowel_movement"])}、便性は${emrQuestionnaireText_(questionnaire, ["i2_stool_consistency", "q3_stool_consistency"])}。`,
+      `排便時の様子は${emrQuestionnaireText_(questionnaire, ["i3_stool_behavior", "q4_pain"])}。`,
+      `便秘対応は${emrQuestionnaireText_(questionnaire, ["i10_constipation_support", "q6_med_status"])}。`,
+      diaryText,
+    ].filter(Boolean).join("");
+  }
+  if (profile === "child") {
+    return [
+      `最終排便は${emrQuestionnaireText_(questionnaire, ["c1_last_bowel_movement", "q1_last_bowel_movement"])}、便性は${emrQuestionnaireText_(questionnaire, ["c2_stool_consistency", "q3_stool_consistency"])}。`,
+      `痛み・困りごとは${emrQuestionnaireText_(questionnaire, ["c3_pain_problem", "q4_pain"])}、がまん・回避は${emrQuestionnaireText_(questionnaire, ["c4_withholding", "q5_withholding"])}。`,
+      `薬は${emrQuestionnaireText_(questionnaire, ["c10_med_status", "q6_med_status"])}。`,
+      diaryText,
+    ].filter(Boolean).join("");
+  }
+  return [
+    `排便は${emrQuestionnaireText_(questionnaire, ["q2_bowel_frequency"])}で、便性は${emrQuestionnaireText_(questionnaire, ["q3_stool_consistency"])}。`,
+    `排便時痛は${emrQuestionnaireText_(questionnaire, ["q4_pain"])}、がまんは${emrQuestionnaireText_(questionnaire, ["q5_withholding"])}。`,
+    `処方された薬は${emrQuestionnaireText_(questionnaire, ["q6_med_status"])}。`,
+    diaryText,
+  ].filter(Boolean).join("");
+}
+
+function emrQuestionnaireText_(questionnaire, keys) {
+  const value = firstQuestionnaireValue_(questionnaire, keys);
+  return value || "未確認";
+}
+
+function emrDiarySentence_(diary) {
+  const recordedDays = diary.diary_days_recorded;
+  const parts = [];
+  if (diary.diary_bowel_days !== "" && diary.diary_bowel_days !== undefined) parts.push(`排便あり${diary.diary_bowel_days}日`);
+  if (diary.diary_hard_days !== "" && diary.diary_hard_days !== undefined) parts.push(`硬い便${diary.diary_hard_days}日`);
+  if (diary.diary_pain_days !== "" && diary.diary_pain_days !== undefined) parts.push(`痛み${diary.diary_pain_days}日`);
+  if (diary.diary_med_taken_days !== "" && diary.diary_med_taken_days !== undefined) parts.push(`内服${diary.diary_med_taken_days}日`);
+  if (!parts.length) return "";
+  if (recordedDays !== "" && recordedDays !== undefined) return `${recordedDays}日のうち、${parts.join("、")}。`;
+  return `直近日誌では、${parts.join("、")}。`;
+}
+
 function normalizeChatGPTMode_(mode) {
   const value = String(mode || "").trim();
   if (value === "treatmentReview" || value === "treatment" || value === "doctorTreatment") return "treatmentReview";
@@ -877,6 +946,7 @@ function generateDoctorHistoryHtml(params) {
       .copy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
       button { min-height: 40px; padding: 8px 14px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
       .copy-status { color: #5d6673; }
+      textarea { width: 100%; min-height: 86px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; resize: vertical; }
       pre { overflow: auto; white-space: pre-wrap; line-height: 1.55; padding: 14px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
       a { color: #07576b; font-weight: 800; }
       @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
@@ -897,6 +967,17 @@ function generateDoctorHistoryHtml(params) {
           ${htmlItem_("最終確認日", displayValueForKey_("background_updated_at", history.patient && history.patient.background_updated_at), "meta")}
           ${htmlItem_("台帳メモ", history.patient && history.patient.note, "meta")}
         </div>
+      </section>
+      <section class="panel">
+        <h2>電子カルテ貼り付け用</h2>
+        <p class="meta">最新のQR問診と直近日誌から短文を作ります。処方歴は含めません。</p>
+        <textarea id="emrDoctorMemo" placeholder="必要なら電子カルテに残す医師メモを追記">${escapeHtml_(history.visits[0] && history.visits[0].doctor_note ? history.visits[0].doctor_note : "")}</textarea>
+        <div class="copy-row">
+          <button type="button" id="refreshEmrTextButton">本文を更新</button>
+          <button type="button" id="copyEmrTextButton">電子カルテ用テキストをコピー</button>
+          <span id="emrTextStatus" class="copy-status"></span>
+        </div>
+        <pre id="emrTextOutput">${escapeHtml_(generateEmrTextFromHistory_(history, ""))}</pre>
       </section>
       <details>
         <summary>ChatGPT診察前整理テキストをページ内で表示</summary>
@@ -940,6 +1021,30 @@ function generateDoctorHistoryHtml(params) {
     <script>
       const patientId = ${JSON.stringify(history.patient_id)};
       const historyLimit = ${JSON.stringify(normalizeLimit_(params.limit, 5))};
+      const baseEmrText = ${JSON.stringify(generateEmrBaseTextFromHistory_(history))};
+
+      function currentEmrText() {
+        const memo = document.getElementById("emrDoctorMemo").value.trim();
+        return memo ? baseEmrText + "\\n医師メモ: " + memo : baseEmrText;
+      }
+
+      function refreshEmrText() {
+        document.getElementById("emrTextOutput").textContent = currentEmrText();
+        document.getElementById("emrTextStatus").textContent = "";
+      }
+
+      document.getElementById("emrDoctorMemo").addEventListener("input", refreshEmrText);
+      document.getElementById("refreshEmrTextButton").addEventListener("click", refreshEmrText);
+      document.getElementById("copyEmrTextButton").addEventListener("click", async () => {
+        refreshEmrText();
+        const status = document.getElementById("emrTextStatus");
+        try {
+          await navigator.clipboard.writeText(document.getElementById("emrTextOutput").textContent || "");
+          status.textContent = "コピーしました。";
+        } catch (error) {
+          status.textContent = "コピーできませんでした。表示テキストを選択してコピーしてください。";
+        }
+      });
 
       function loadContextText(mode, status) {
         const target = document.querySelector('pre[data-context-mode="' + mode + '"]');

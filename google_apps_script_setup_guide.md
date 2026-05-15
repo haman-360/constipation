@@ -92,6 +92,12 @@ http://localhost:8000/index.html?patient_id=12345&visit_token=A7K2
 
 注意: `127.0.0.1` は開いている端末自身を指すため、iPhoneで読むQRには使えない。iPhoneからMac上のローカルサーバーを開く場合は、MacとiPhoneを同じWi-Fiに接続し、問診アプリURLを `http://MacのIPアドレス:8001/index.html` の形にする。例: `http://192.168.11.3:8001/index.html`。
 
+## 6. 電子カルテ貼り付け用テキスト
+
+医師用履歴画面の `電子カルテ貼り付け用` から、最新のQR問診と直近日誌を短文にしたテキストをコピーできる。
+
+必要に応じて、その場で医師メモを追記してからコピーする。電子カルテ側に当日の処方が残る前提のため、処方履歴はこのテキストには含めない。
+
 GitHub Pagesで公開した後は、固定URLの `visit-link.html` を開く。受付ページをGitHub Pages上で開くと、詳細設定の問診アプリURLは同じGitHub Pages上の `index.html` になる。
 
 ```text

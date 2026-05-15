@@ -26,6 +26,25 @@ Apps Scriptエディタで `setupSheets` を選び、実行する。
 - `toilet_training`
 - `diary_weekly`
 
+## 2.5 既存の日付データを一括変換
+
+Google Sheetsへ貼り付け済みの日付が `2025/08/01` のようになっている場合は、Apps Scriptエディタで `normalizeExistingDateColumns` を選び、実行する。
+
+スプレッドシートを開き直すと、上部メニューの `便秘問診 > 日付フォーマットを一括変換` からも実行できる。
+
+対象列:
+
+- `patients.birth_date`
+- `patients.background_updated_at`
+- `visits.submitted_at`
+- `visits.saved_at`
+- `prescriptions.date`
+- `toilet_training.date`
+- `diary_weekly.period_start`
+- `diary_weekly.period_end`
+
+セル全体が日付または日時として成立する値だけを変換する。例: `2025/08/01` は `2025-08-01`、`2025/08/01 9:05` は `2025-08-01 09:05:00` になる。不正な日付やメモ本文はそのまま残る。
+
 ## 3. Web Appとしてデプロイ
 
 1. Apps Script右上の `デプロイ` を開く。

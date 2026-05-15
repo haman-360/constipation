@@ -2,6 +2,12 @@
 
 設計意図や方針変更を残すための開発ログです。細かい変更履歴はGitに任せ、ここでは「なぜその方向にしたか」を短く記録します。
 
+## 2026-05-15
+
+- `bulk-import/date-format-converter.html` を追加し、TSV内の日付セルを `YYYY/MM/DD` からGoogle Sheets向けの `YYYY-MM-DD` へ一括変換できるようにした。
+- 変換ロジックはセル全体が日付または日時として成立する場合だけ適用し、不正な日付や本文メモはそのまま残す方針にした。
+- Apps Scriptへ `normalizeExistingDateColumns` を追加し、既にGoogle Sheetsへ貼り付けた日付列もシート上で一括正規化できるようにした。
+
 ## 2026-05-14
 
 - 開発履歴管理の入口として `PROJECT.md` / `TODO.md` / `DEVLOG.md` の役割を整理した。GitHubのcommit履歴だけでは後から設計意図を追いにくいため、大きな判断はこのファイルへ日付ごとに残す方針にした。

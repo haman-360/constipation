@@ -27,6 +27,8 @@
   - Google Sheetsの `diary_weekly` タブへ貼り付ける形式です。
 - `visits_summary_template.tsv`
   - 過去受診の要約だけを `visits` タブへ入れたい場合の簡易テンプレートです。
+- `date-format-converter.html`
+  - TSV内の日付セルを `2025/08/01` から `2025-08-01` のように一括変換する補助ツールです。
 
 ## 推奨運用
 
@@ -40,7 +42,7 @@
 
 - `patient_id` は必ず5桁で入力します。例: `00123`
 - 氏名、住所、電話番号など、患者さんを直接特定できる情報は入れません。
-- 日付は `YYYY-MM-DD` を基本にします。時刻が必要な場合は `YYYY-MM-DD HH:MM` で入力します。
+- 日付は `YYYY-MM-DD` を基本にします。`YYYY/MM/DD` で入力済みの場合は、`date-format-converter.html` にTSVを貼り付けると一括変換できます。時刻が必要な場合は `YYYY-MM-DD HH:MM` で入力します。
 - 処方量や指示内容は医師が後から見て分かる表現にします。
 - 不明な項目は空欄で構いません。
 

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TSV日付フォーマット変換</title>
+    <link rel="stylesheet" href="../constipation-ai-mvp/styles.css" />
+  </head>
+  <body>
+    <main class="link-tool-shell">
+      <section class="link-tool panel">
+        <div class="link-tool__header">
+          <h1>TSV日付フォーマット変換</h1>
+          <p>TSVを貼り付けて、日付セルをGoogle Sheets向けの yyyy-mm-dd 形式に一括変換します。</p>
+        </div>
+
+        <label class="link-field link-field--wide converter-field">
+          <span>変換前TSV</span>
+          <textarea id="tsvInput" class="text-input converter-textarea" spellcheck="false" placeholder="例:&#10;patient_id&#9;date&#10;00123&#9;2025/08/01"></textarea>
+        </label>
+
+        <div class="link-tool__actions">
+          <button id="convertButton" class="button" type="button">変換</button>
+          <button id="copyButton" class="button button--secondary" type="button">コピー</button>
+          <button id="clearButton" class="button button--secondary" type="button">クリア</button>
+        </div>
+
+        <label class="link-field link-field--wide converter-field">
+          <span>変換後TSV</span>
+          <textarea id="tsvOutput" class="text-input converter-textarea" spellcheck="false" readonly></textarea>
+        </label>
+
+        <p id="converterMessage" class="link-tool__message" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="./date-format-converter.js"></script>
+  </body>
+</html>

@@ -147,12 +147,20 @@ const SHEET_DEFINITIONS = [
     widths: [170, 95, 95, 175, 175, 105, 120, 300, 260, 180, 420, 420, 360, 130, 260, 120, 130, 170],
     hiddenHeaders: ["questionnaire_json", "diary_json"],
     plainTextHeaders: ["visit_id", "patient_id", "visit_token"],
+    dateTimeHeaders: ["submitted_at", "saved_at"],
   },
   { name: SHEET_NAMES.prescriptions, headers: PRESCRIPTIONS_HEADERS, widths: [150, 95, 170, 160, 140, 260, 260], plainTextHeaders: ["prescription_id", "patient_id"], dateTimeHeaders: ["date"] },
   { name: SHEET_NAMES.toiletTraining, headers: TOILET_TRAINING_HEADERS, widths: [95, 170, 150, 140, 140, 260], plainTextHeaders: ["patient_id"], dateTimeHeaders: ["date"] },
-  { name: SHEET_NAMES.diaryWeekly, headers: DIARY_WEEKLY_HEADERS, widths: [95, 120, 120, 110, 110, 160, 100, 100, 125, 125, 130, 260], plainTextHeaders: ["patient_id"] },
+  { name: SHEET_NAMES.diaryWeekly, headers: DIARY_WEEKLY_HEADERS, widths: [95, 120, 120, 110, 110, 160, 100, 100, 125, 125, 130, 260], plainTextHeaders: ["patient_id"], dateHeaders: ["period_start", "period_end"] },
 ];
 
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("便秘問診")
+    .addItem("シートを整える", "formatExistingSheets")
+    .addItem("日付フォーマットを一括変換", "normalizeExistingDateColumns")
+    .addToUi();
+}
 
 function doGet(e) {
   try {
@@ -1863,6 +1871,101 @@ function setupSheets() {
 
 function formatExistingSheets() {
   setupSheets();
+}
+
+function normalizeExistingDateColumns() {
+  const summary = SHEET_DEFINITIONS.map((definition) => {
+    const sheet = getSpreadsheet_().getSheetByName(definition.name);
+    if (!sheet) return `${definition.name}: シートなし`;
+    formatTemplateSheet_(sheet, definition);
+    const dateResult = normalizeDateColumnsForSheet_(sheet, definition, definition.dateHeaders || [], "date");
+    const dateTimeResult = normalizeDateColumnsForSheet_(sheet, definition, definition.dateTimeHeaders || [], "datetime");
+    const changed = dateResult.changed + dateTimeResult.changed;
+    const invalid = dateResult.invalid + dateTimeResult.invalid;
+    return `${definition.name}: 変換 ${changed} 件、不正または未対応 ${invalid} 件`;
+  });
+
+  const message = summary.join("\n");
+  try {
+    SpreadsheetApp.getUi().alert(`日付フォーマット変換が完了しました。\n\n${message}`);
+  } catch (error) {
+    Logger.log(message);
+  }
+  return summary;
+}
+
+function normalizeDateColumnsForSheet_(sheet, definition, headersToNormalize, mode) {
+  const result = { changed: 0, invalid: 0 };
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2 || !headersToNormalize.length) return result;
+
+  headersToNormalize.forEach((header) => {
+    const column = definition.headers.indexOf(header) + 1;
+    if (column <= 0) return;
+    const range = sheet.getRange(2, column, lastRow - 1, 1);
+    const values = range.getValues();
+    const normalizedValues = values.map(([value]) => {
+      const normalized = normalizeExistingDateValue_(value, mode);
+      if (normalized.invalid) result.invalid += 1;
+      if (normalized.changed) result.changed += 1;
+      return [normalized.value];
+    });
+    range.setValues(normalizedValues);
+    range.setNumberFormat(mode === "datetime" ? "yyyy-mm-dd hh:mm:ss" : "yyyy-mm-dd");
+  });
+
+  return result;
+}
+
+function normalizeExistingDateValue_(value, mode) {
+  if (value === "" || value === null || value === undefined) {
+    return { value: "", changed: false, invalid: false };
+  }
+
+  if (value instanceof Date) {
+    if (!Number.isFinite(value.getTime())) return { value, changed: false, invalid: true };
+    const normalized = mode === "datetime" ? formatDateTimeParts_(dateParts_(value), true) : formatDateParts_(dateParts_(value));
+    return { value: normalized, changed: true, invalid: false };
+  }
+
+  const original = String(value);
+  const text = original.normalize("NFKC").trim();
+  const parts = strictDateParts_(text);
+  if (!parts) {
+    return { value: original, changed: false, invalid: looksLikeDateText_(text) };
+  }
+
+  const normalized = mode === "datetime" ? formatDateTimeParts_(parts, true) : formatDateParts_(parts);
+  return { value: normalized, changed: normalized !== original, invalid: false };
+}
+
+function strictDateParts_(value) {
+  const match = String(value || "").match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (!match) return null;
+  const parts = {
+    year: Number.parseInt(match[1], 10),
+    month: Number.parseInt(match[2], 10),
+    day: Number.parseInt(match[3], 10),
+    hour: match[4] === undefined ? 0 : Number.parseInt(match[4], 10),
+    minute: match[5] === undefined ? 0 : Number.parseInt(match[5], 10),
+    second: match[6] === undefined ? 0 : Number.parseInt(match[6], 10),
+    hasTime: match[4] !== undefined,
+  };
+  return isValidDateParts_(parts) ? parts : null;
+}
+
+function looksLikeDateText_(value) {
+  return /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(String(value || ""));
+}
+
+function formatDateParts_(parts) {
+  return `${parts.year}-${pad2_(parts.month)}-${pad2_(parts.day)}`;
+}
+
+function formatDateTimeParts_(parts, includeSeconds) {
+  const dateText = formatDateParts_(parts);
+  const timeText = `${pad2_(parts.hour)}:${pad2_(parts.minute)}`;
+  return includeSeconds ? `${dateText} ${timeText}:${pad2_(parts.second)}` : `${dateText} ${timeText}`;
 }
 
 function parseJsonBody_(e) {

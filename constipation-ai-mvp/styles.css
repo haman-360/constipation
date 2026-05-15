@@ -1001,6 +1001,17 @@ pre {
   background: #fff;
 }
 
+.converter-field {
+  margin-top: 16px;
+}
+
+.converter-textarea {
+  min-height: 220px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  white-space: pre;
+  overflow: auto;
+}
+
 .link-field__inline {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -38,18 +38,41 @@
     return { value: normalized, changed: normalized !== original, invalidDate: false };
   }
 
+  function normalizePatientIdCell(value) {
+    const original = String(value ?? "");
+    const text = original.normalize("NFKC").trim();
+    if (!/^\d{1,5}$/.test(text)) return { value: original, changed: false };
+    const normalized = text.padStart(5, "0");
+    return { value: normalized, changed: normalized !== original };
+  }
+
   function convertTsvDateFormat(input) {
     const text = String(input ?? "");
     let changedCells = 0;
+    let dateChangedCells = 0;
+    let patientIdChangedCells = 0;
     let invalidCells = 0;
+    const lines = text.split(/\n/);
+    const headers = (lines[0] || "").split("\t").map((header) => String(header || "").trim());
     const output = text
       .split(/\n/)
-      .map((line) =>
+      .map((line, rowIndex) =>
         line
           .split("\t")
-          .map((cell) => {
+          .map((cell, columnIndex) => {
+            if (rowIndex > 0 && headers[columnIndex] === "patient_id") {
+              const result = normalizePatientIdCell(cell);
+              if (result.changed) {
+                changedCells += 1;
+                patientIdChangedCells += 1;
+              }
+              return result.value;
+            }
             const result = normalizeDateCell(cell);
-            if (result.changed) changedCells += 1;
+            if (result.changed) {
+              changedCells += 1;
+              dateChangedCells += 1;
+            }
             if (result.invalidDate) invalidCells += 1;
             return result.value;
           })
@@ -57,7 +80,7 @@
       )
       .join("\n");
 
-    return { output, changedCells, invalidCells };
+    return { output, changedCells, dateChangedCells, patientIdChangedCells, invalidCells };
   }
 
   function setupBrowserUi() {
@@ -79,7 +102,7 @@
       const result = convertTsvDateFormat(els.input.value);
       els.output.value = result.output;
       const invalidText = result.invalidCells ? ` 不正な日付らしいセル ${result.invalidCells} 件はそのまま残しました。` : "";
-      setMessage(`${result.changedCells} 件の日付セルを変換しました。${invalidText}`);
+      setMessage(`日付 ${result.dateChangedCells} 件、患者ID ${result.patientIdChangedCells} 件を変換しました。${invalidText}`);
     });
 
     els.copy.addEventListener("click", async () => {
@@ -103,7 +126,7 @@
     });
   }
 
-  const api = { normalizeDateCell, convertTsvDateFormat };
+  const api = { normalizeDateCell, normalizePatientIdCell, convertTsvDateFormat };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.DateFormatConverter = api;
   if (typeof document !== "undefined") setupBrowserUi();

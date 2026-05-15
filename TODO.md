@@ -77,6 +77,7 @@
 - [x] 医師側履歴読み込み画面または関数
 - [x] ChatGPT貼り付け用テキスト生成
 - [x] 既存Google Sheets日付列の一括フォーマット変換
+- [x] 既存Google Sheets患者ID列の5桁補正
 - [x] 回答後QRの短縮形式検討
 - [x] HTMLからApps ScriptへのPOST送信
 - [x] テスト患者データのvisits保存確認

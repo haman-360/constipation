@@ -158,7 +158,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("便秘問診")
     .addItem("シートを整える", "formatExistingSheets")
-    .addItem("日付フォーマットを一括変換", "normalizeExistingDateColumns")
+    .addItem("日付・IDなどのフォーマットを一括変換", "normalizeExistingFormats")
     .addToUi();
 }
 
@@ -1873,25 +1873,64 @@ function formatExistingSheets() {
   setupSheets();
 }
 
-function normalizeExistingDateColumns() {
+function normalizeExistingFormats() {
   const summary = SHEET_DEFINITIONS.map((definition) => {
     const sheet = getSpreadsheet_().getSheetByName(definition.name);
     if (!sheet) return `${definition.name}: シートなし`;
+    const plainTextResult = normalizePlainTextColumnsForSheet_(sheet, definition, definition.plainTextHeaders || []);
     formatTemplateSheet_(sheet, definition);
     const dateResult = normalizeDateColumnsForSheet_(sheet, definition, definition.dateHeaders || [], "date");
     const dateTimeResult = normalizeDateColumnsForSheet_(sheet, definition, definition.dateTimeHeaders || [], "datetime");
-    const changed = dateResult.changed + dateTimeResult.changed;
+    const changed = plainTextResult.changed + dateResult.changed + dateTimeResult.changed;
     const invalid = dateResult.invalid + dateTimeResult.invalid;
-    return `${definition.name}: 変換 ${changed} 件、不正または未対応 ${invalid} 件`;
+    const patientIdText = plainTextResult.patientIds ? `ID ${plainTextResult.patientIds} 件、` : "";
+    return `${definition.name}: ${patientIdText}変換 ${changed} 件、不正または未対応 ${invalid} 件`;
   });
 
   const message = summary.join("\n");
   try {
-    SpreadsheetApp.getUi().alert(`日付フォーマット変換が完了しました。\n\n${message}`);
+    SpreadsheetApp.getUi().alert(`日付・IDなどのフォーマット変換が完了しました。\n\n${message}`);
   } catch (error) {
     Logger.log(message);
   }
   return summary;
+}
+
+function normalizeExistingDateColumns() {
+  return normalizeExistingFormats();
+}
+
+function normalizePlainTextColumnsForSheet_(sheet, definition, headersToNormalize) {
+  const result = { changed: 0, patientIds: 0 };
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2 || !headersToNormalize.length) return result;
+
+  headersToNormalize.forEach((header) => {
+    const column = definition.headers.indexOf(header) + 1;
+    if (column <= 0) return;
+    const range = sheet.getRange(2, column, lastRow - 1, 1);
+    const values = range.getDisplayValues().map(([value]) => {
+      const normalized = normalizePlainTextCell_(value, header);
+      if (normalized.changed) {
+        result.changed += 1;
+        if (header === "patient_id") result.patientIds += 1;
+      }
+      return [normalized.value];
+    });
+    range.setNumberFormat("@").setValues(values);
+  });
+
+  return result;
+}
+
+function normalizePlainTextCell_(value, header) {
+  const original = String(value || "");
+  const text = original.normalize("NFKC").trim();
+  if (header === "patient_id" && /^\d{1,5}$/.test(text)) {
+    const padded = text.padStart(5, "0");
+    return { value: padded, changed: padded !== original };
+  }
+  return { value: text, changed: text !== original };
 }
 
 function normalizeDateColumnsForSheet_(sheet, definition, headersToNormalize, mode) {

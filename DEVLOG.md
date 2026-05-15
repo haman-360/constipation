@@ -7,6 +7,7 @@
 - `bulk-import/date-format-converter.html` を追加し、TSV内の日付セルを `YYYY/MM/DD` からGoogle Sheets向けの `YYYY-MM-DD` へ一括変換できるようにした。
 - 変換ロジックはセル全体が日付または日時として成立する場合だけ適用し、不正な日付や本文メモはそのまま残す方針にした。
 - Apps Scriptへ `normalizeExistingDateColumns` を追加し、既にGoogle Sheetsへ貼り付けた日付列もシート上で一括正規化できるようにした。
+- 一括正規化を `normalizeExistingFormats` に拡張し、各シートの `patient_id` も4桁以下から5桁へ補正できるようにした。
 
 ## 2026-05-14
 

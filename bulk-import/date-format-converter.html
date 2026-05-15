@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TSV日付フォーマット変換</title>
+    <title>TSVフォーマット一括変換</title>
     <link rel="stylesheet" href="../constipation-ai-mvp/styles.css" />
   </head>
   <body>
     <main class="link-tool-shell">
       <section class="link-tool panel">
         <div class="link-tool__header">
-          <h1>TSV日付フォーマット変換</h1>
-          <p>TSVを貼り付けて、日付セルをGoogle Sheets向けの yyyy-mm-dd 形式に一括変換します。</p>
+          <h1>TSVフォーマット一括変換</h1>
+          <p>TSVを貼り付けて、日付セルと患者IDをGoogle Sheets向けの形式に一括変換します。</p>
         </div>
 
         <label class="link-field link-field--wide converter-field">
           <span>変換前TSV</span>
-          <textarea id="tsvInput" class="text-input converter-textarea" spellcheck="false" placeholder="例:&#10;patient_id&#9;date&#10;00123&#9;2025/08/01"></textarea>
+          <textarea id="tsvInput" class="text-input converter-textarea" spellcheck="false" placeholder="例:&#10;patient_id&#9;date&#10;1234&#9;2025/08/01"></textarea>
         </label>
 
         <div class="link-tool__actions">

@@ -2380,6 +2380,7 @@ function htmlItem_(label, value, forcedLevel) {
 function itemImportanceLevel_(label, value) {
   const text = cellText_(value);
   if (text === "未記録" || text === "未確認" || text === "なし") return "missing";
+  if (isZeroDaySafetyItem_(label, text)) return "good";
   if (/(今日|昨日|1日1回|痛がらない|ない|特にない|行ける|普通|やわらかい|先生に言われた量で飲んでいる|便秘薬は使っていない)/.test(text)) {
     return "good";
   }
@@ -2392,6 +2393,11 @@ function itemImportanceLevel_(label, value) {
     return "check";
   }
   return "meta";
+}
+
+function isZeroDaySafetyItem_(label, text) {
+  if (!/^0日$/.test(String(text || "").trim())) return false;
+  return /^(最長無排便|硬い便|痛みの日|がまんの日|便もれ)$/.test(String(label || "").trim());
 }
 
 function displayAgeProfile_(profile) {

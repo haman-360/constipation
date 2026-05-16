@@ -288,8 +288,24 @@ function savePrescription_(params) {
   upsertPatient_(patientId, savedAt);
   const sheet = getOrCreateSheet_(SHEET_NAMES.prescriptions, PRESCRIPTIONS_HEADERS);
   entries.forEach((entry, index) => {
+    const prescriptionId = entry.prescription_id || params.prescription_id || generateRowId_("RX", patientId, `${date}-${index + 1}`);
+    const values = [
+      prescriptionId,
+      patientId,
+      date,
+      entry.medicine_name,
+      entry.dose,
+      String(params.instruction || "").trim(),
+      String(params.doctor_note || "").trim(),
+    ];
+    const existingRow = findRowByExactKey_(sheet, PRESCRIPTIONS_HEADERS, "prescription_id", prescriptionId);
+    if (existingRow) {
+      sheet.getRange(existingRow, 1, 1, PRESCRIPTIONS_HEADERS.length).setValues([values]);
+      sheet.getRange(existingRow, 1, 1, 2).setNumberFormat("@").setValues([[prescriptionId, patientId]]);
+      return;
+    }
     sheet.appendRow([
-      entry.prescription_id || params.prescription_id || generateRowId_("RX", patientId, `${date}-${index + 1}`),
+      prescriptionId,
       patientId,
       date,
       entry.medicine_name,
@@ -297,6 +313,8 @@ function savePrescription_(params) {
       String(params.instruction || "").trim(),
       String(params.doctor_note || "").trim(),
     ]);
+    const row = sheet.getLastRow();
+    sheet.getRange(row, 1, 1, 2).setNumberFormat("@").setValues([[prescriptionId, patientId]]);
   });
   return entries.length;
 }
@@ -308,14 +326,103 @@ function saveToiletTraining_(params) {
   if (!hasToiletTrainingInput_(params)) throw new Error("トイレトレーニング履歴の内容を入力してください。");
   upsertPatient_(patientId, savedAt);
   const sheet = getOrCreateSheet_(SHEET_NAMES.toiletTraining, TOILET_TRAINING_HEADERS);
-  sheet.appendRow([
+  const values = [
     patientId,
     date,
     String(params.training_status || "").trim(),
     String(params.diaper_status || "").trim(),
     String(params.toilet_refusal || "").trim(),
     String(params.note || "").trim(),
-  ]);
+  ];
+  const existingRow = findSimpleHistoryRow_(sheet, TOILET_TRAINING_HEADERS, patientId, "date", params.original_training_date || params.original_date || params.training_date || params.date);
+  if (existingRow) {
+    sheet.getRange(existingRow, 1, 1, TOILET_TRAINING_HEADERS.length).setValues([values]);
+    sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
+    return;
+  }
+  sheet.appendRow(values);
+  sheet.getRange(sheet.getLastRow(), 1).setNumberFormat("@").setValue(patientId);
+}
+
+function saveDiaryWeekly_(params) {
+  const patientId = requirePatientId_(params.patient_id);
+  const savedAt = new Date().toISOString();
+  const periodStart = normalizeOptionalDate_(params.period_start);
+  const periodEnd = normalizeOptionalDate_(params.period_end);
+  if (!hasDiaryWeeklyInput_(params)) throw new Error("週次日誌の内容を入力してください。");
+  upsertPatient_(patientId, savedAt);
+  const sheet = getOrCreateSheet_(SHEET_NAMES.diaryWeekly, DIARY_WEEKLY_HEADERS);
+  const values = [
+    patientId,
+    periodStart,
+    periodEnd,
+    numberOrBlank_(params.recorded_days),
+    numberOrBlank_(params.bowel_days),
+    numberOrBlank_(params.longest_no_bowel_days),
+    numberOrBlank_(params.hard_days),
+    numberOrBlank_(params.pain_days),
+    numberOrBlank_(params.withholding_days),
+    numberOrBlank_(params.soiling_days),
+    numberOrBlank_(params.med_taken_days),
+    String(params.diary_note || params.note || "").trim(),
+  ];
+  const existingRow = findDiaryWeeklyRow_(sheet, patientId, params.original_period_start || periodStart, params.original_period_end || periodEnd);
+  if (existingRow) {
+    sheet.getRange(existingRow, 1, 1, DIARY_WEEKLY_HEADERS.length).setValues([values]);
+    sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(patientId);
+    return { ok: true, updated: true };
+  }
+  sheet.appendRow(values);
+  sheet.getRange(sheet.getLastRow(), 1).setNumberFormat("@").setValue(patientId);
+  return { ok: true, updated: false };
+}
+
+function saveVisitSummary_(params) {
+  const patientId = requirePatientId_(params.patient_id);
+  const savedAt = dateTimeInScriptTimezone_(new Date());
+  const submittedAt = dateTimeInScriptTimezone_(params.visit_date || params.submitted_at || savedAt);
+  const summaryText = String(params.summary_text || "").trim();
+  const doctorNote = String(params.visit_doctor_note || params.doctor_note || "").trim();
+  const headline = String(params.headline || "").trim() || (summaryText ? `過去受診要約: ${summaryText.slice(0, 40)}` : "");
+  if (!submittedAt) throw new Error("受診日を入力してください。");
+  if (!headline && !summaryText && !doctorNote) throw new Error("過去受診要約の内容を入力してください。");
+  upsertPatient_(patientId, savedAt);
+
+  const sheet = getOrCreateSheet_(SHEET_NAMES.visits, VISITS_HEADERS);
+  const patient = getPatient_(patientId);
+  const ageProfile = normalizeAgeProfile_(params.age_profile) === "unknown" ? patientAgeProfile_(patient, submittedAt) : normalizeAgeProfile_(params.age_profile);
+  const visitId = String(params.visit_id || params.original_visit_id || "").trim()
+    || generateHistoricalVisitId_(patientId, submittedAt);
+  const values = [
+    visitId,
+    patientId,
+    String(params.visit_token || "").trim(),
+    submittedAt,
+    savedAt,
+    String(params.urgency_level || "stable").trim(),
+    String(params.urgency_label || "通常確認").trim(),
+    headline,
+    String(params.questionnaire_json || "{}").trim() || "{}",
+    String(params.diary_json || "{}").trim() || "{}",
+    summaryText || headline,
+    String(params.facility_share_text || "").trim(),
+    String(params.patient_memo_text || "").trim(),
+    true,
+    doctorNote,
+    ageProfile,
+    String(params.age_text_at_visit || patientAgeText_(patient, submittedAt)).trim(),
+    String(params.questionnaire_version || "historical-summary").trim(),
+  ];
+  const existingRow = findRowByExactKey_(sheet, VISITS_HEADERS, "visit_id", params.original_visit_id || params.visit_id);
+  if (existingRow) {
+    sheet.getRange(existingRow, 1, 1, VISITS_HEADERS.length).setValues([values]);
+    sheet.getRange(existingRow, 1, 1, 3).setNumberFormat("@").setValues([[visitId, patientId, values[2]]]);
+    return { ok: true, updated: true };
+  }
+  sheet.appendRow(values);
+  const row = sheet.getLastRow();
+  sheet.getRange(row, 1, 1, 3).setNumberFormat("@").setValues([[visitId, patientId, values[2]]]);
+  return { ok: true, updated: false };
 }
 
 function saveDoctorEntries_(params) {
@@ -328,7 +435,15 @@ function saveDoctorEntries_(params) {
     saveToiletTraining_(params);
     saved.push("トイレトレーニング履歴");
   }
-  if (!saved.length) throw new Error("保存する処方履歴またはトイレトレーニング履歴を入力してください。");
+  if (hasDiaryWeeklyInput_(params)) {
+    saveDiaryWeekly_(params);
+    saved.push("週次日誌");
+  }
+  if (hasVisitSummaryInput_(params)) {
+    saveVisitSummary_(params);
+    saved.push("過去受診要約");
+  }
+  if (!saved.length) throw new Error("保存する履歴を入力してください。");
   return saved;
 }
 
@@ -347,6 +462,8 @@ function saveDoctorEntriesFromDoctorForm(formObject) {
   const savedSections = [];
   if (hasPrescriptionInput_(params)) savedSections.push("prescription");
   if (hasToiletTrainingInput_(params)) savedSections.push("toiletTraining");
+  if (hasVisitSummaryInput_(params)) savedSections.push("visitSummary");
+  if (hasDiaryWeeklyInput_(params)) savedSections.push("diaryWeekly");
   const saved = saveDoctorEntries_(params);
   return { ok: true, message: `${saved.join("、")}を保存しました。`, saved_sections: savedSections };
 }
@@ -400,6 +517,26 @@ function savePatientProfileFromForm(formObject) {
   return { ok: true, message: "患者台帳を保存しました。" };
 }
 
+function saveDiaryWeeklyFromDoctorForm(formObject) {
+  const result = saveDiaryWeekly_(formObject || {});
+  return { ok: true, message: result.updated ? "週次日誌を更新しました。" : "週次日誌を保存しました。", saved_sections: ["diaryWeekly"] };
+}
+
+function saveVisitSummaryFromDoctorForm(formObject) {
+  const result = saveVisitSummary_(formObject || {});
+  return { ok: true, message: result.updated ? "過去受診要約を更新しました。" : "過去受診要約を保存しました。", saved_sections: ["visitSummary"] };
+}
+
+function updatePrescriptionFromDoctorForm(formObject) {
+  savePrescription_(formObject || {});
+  return { ok: true, message: "処方履歴を更新しました。" };
+}
+
+function updateToiletTrainingFromDoctorForm(formObject) {
+  saveToiletTraining_(formObject || {});
+  return { ok: true, message: "トイレトレーニング履歴を更新しました。" };
+}
+
 function hasPrescriptionInput_(params) {
   if (["medicine_name", "dose", "instruction", "doctor_note"].some((key) => String(params[key] || "").trim())) return true;
   for (let index = 0; index < 5; index += 1) {
@@ -449,6 +586,69 @@ function prescriptionDoseText_(amountValue, unitValue, fallbackValue) {
 
 function hasToiletTrainingInput_(params) {
   return ["training_status", "diaper_status", "toilet_refusal", "note"].some((key) => String(params[key] || "").trim());
+}
+
+function hasDiaryWeeklyInput_(params) {
+  return [
+    "recorded_days",
+    "bowel_days",
+    "longest_no_bowel_days",
+    "hard_days",
+    "pain_days",
+    "withholding_days",
+    "soiling_days",
+    "med_taken_days",
+    "diary_note",
+    "note",
+  ].some((key) => String(params[key] || "").trim());
+}
+
+function hasVisitSummaryInput_(params) {
+  return ["headline", "summary_text", "visit_doctor_note"].some((key) => String(params[key] || "").trim());
+}
+
+function findRowByExactKey_(sheet, headers, key, value) {
+  const searchValue = String(value || "").trim();
+  const column = headers.indexOf(key) + 1;
+  if (!searchValue || column <= 0 || sheet.getLastRow() < 2) return 0;
+  const values = sheet.getRange(2, column, sheet.getLastRow() - 1, 1).getDisplayValues();
+  for (let index = 0; index < values.length; index += 1) {
+    if (String(values[index][0] || "").trim() === searchValue) return index + 2;
+  }
+  return 0;
+}
+
+function findSimpleHistoryRow_(sheet, headers, patientId, dateKey, dateValue) {
+  const dateText = dateTimeInScriptTimezone_(dateValue);
+  const patientColumn = headers.indexOf("patient_id") + 1;
+  const dateColumn = headers.indexOf(dateKey) + 1;
+  if (!dateText || patientColumn <= 0 || dateColumn <= 0 || sheet.getLastRow() < 2) return 0;
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
+  for (let index = 0; index < values.length; index += 1) {
+    if (patientIdKey_(values[index][patientColumn - 1]) !== patientId) continue;
+    if (dateTimeInScriptTimezone_(values[index][dateColumn - 1]) === dateText) return index + 2;
+  }
+  return 0;
+}
+
+function findDiaryWeeklyRow_(sheet, patientId, periodStartValue, periodEndValue) {
+  const periodStart = normalizeOptionalDate_(periodStartValue);
+  const periodEnd = normalizeOptionalDate_(periodEndValue);
+  if ((!periodStart && !periodEnd) || sheet.getLastRow() < 2) return 0;
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, DIARY_WEEKLY_HEADERS.length).getValues();
+  for (let index = 0; index < values.length; index += 1) {
+    if (patientIdKey_(values[index][0]) !== patientId) continue;
+    const rowStart = displayDate_(values[index][1]);
+    const rowEnd = displayDate_(values[index][2]);
+    if (periodStart && periodEnd && rowStart === periodStart && rowEnd === periodEnd) return index + 2;
+    if (!periodStart && periodEnd && rowEnd === periodEnd) return index + 2;
+  }
+  return 0;
+}
+
+function generateHistoricalVisitId_(patientId, submittedAt) {
+  const datePart = String(submittedAt || "").slice(0, 10).replace(/\D/g, "") || dateOnlyInScriptTimezone_(new Date()).replace(/\D/g, "");
+  return `HIST-${patientId}-${datePart}-${Date.now()}`;
 }
 
 function upsertPatient_(patientId, createdAt, ageYears, ageMonths) {
@@ -1345,6 +1545,8 @@ function formatPreVisitItemsHtml_(history) {
 function generateDoctorEntryHtml(params) {
   const patientId = requirePatientId_(params.patient_id);
   const nowValue = dateTimeInputValue_(new Date());
+  const todayValue = dateInputValue_(new Date());
+  const history = getPatientHistory({ ...params, patient_id: patientId, limit: normalizeLimit_(params.limit, 5) });
   const formAction = serviceUrl_();
   const historyUrl = buildSelfUrl_("doctorHistory", patientId, normalizeLimit_(params.limit, 5));
   const profileUrl = buildSelfUrl_("patientProfile", patientId, normalizeLimit_(params.limit, 5));
@@ -1362,6 +1564,10 @@ function generateDoctorEntryHtml(params) {
                   <input name="dose_unit_${index}" type="text" data-dose-unit placeholder="${index === 0 ? "例: 包/日、ml/kg/日" : ""}">
                 </label>
               </div>`).join("");
+  const editVisitsHtml = history.visits.length ? history.visits.map(formatVisitEditFormHtml_).join("") : "<p class=\"meta\">受診・問診履歴はまだありません。</p>";
+  const editPrescriptionsHtml = history.prescriptions.length ? history.prescriptions.map(formatPrescriptionEditFormHtml_).join("") : "<p class=\"meta\">処方履歴はまだありません。</p>";
+  const editTrainingHtml = history.toilet_training.length ? history.toilet_training.map(formatToiletTrainingEditFormHtml_).join("") : "<p class=\"meta\">トイレトレーニング履歴はまだありません。</p>";
+  const editDiaryHtml = history.diary_weekly.length ? history.diary_weekly.map(formatDiaryWeeklyEditFormHtml_).join("") : "<p class=\"meta\">週次日誌はまだありません。</p>";
   return `
 <!doctype html>
 <html lang="ja">
@@ -1390,6 +1596,10 @@ function generateDoctorEntryHtml(params) {
       .wide { grid-column: 1 / -1; }
       .medicine-list { grid-column: 1 / -1; display: grid; gap: 10px; }
       .medicine-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(90px, .7fr) minmax(130px, 1fr); gap: 10px; padding: 12px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
+      .edit-list { display: grid; gap: 12px; }
+      .edit-card { padding: 14px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
+      .edit-card__title { margin: 0 0 10px; color: #20242a; font-weight: 800; }
+      details.edit-section > summary { margin-top: 16px; padding: 14px 16px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fff; color: #07576b; cursor: pointer; font-weight: 800; }
       .field-help { margin: 4px 0 0; color: #5d6673; font-size: .9rem; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
       button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
@@ -1470,12 +1680,100 @@ ${medicineRowsHtml}
           </div>
         </section>
 
+        <section class="panel">
+          <h2>過去受診要約を追加</h2>
+          <div class="grid">
+            <label>受診日時
+              <input name="visit_date" type="datetime-local" value="${escapeHtml_(nowValue)}">
+            </label>
+            <label>年齢プロファイル
+              <select name="age_profile">
+                <option value="unknown">年齢未確認</option>
+                <option value="infant">0-1歳</option>
+                <option value="toddler" selected>2-3歳</option>
+                <option value="child">4歳以降</option>
+              </select>
+            </label>
+            <label class="wide">見出し
+              <input name="headline" type="text" placeholder="例: 排便間隔は改善傾向。硬便は残る。">
+            </label>
+            <label class="wide">受診要約
+              <textarea name="summary_text" placeholder="例: 排便は2日に1回程度。排便時痛は軽減。モビコール継続。"></textarea>
+            </label>
+            <label class="wide">医師メモ
+              <textarea name="visit_doctor_note" placeholder="例: 次回、減量可否とトイレ拒否を確認。"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>週次日誌を追加</h2>
+          <div class="grid">
+            <label>開始日
+              <input name="period_start" type="date" value="${escapeHtml_(todayValue)}">
+            </label>
+            <label>終了日
+              <input name="period_end" type="date" value="${escapeHtml_(todayValue)}">
+            </label>
+            <label>記録日数
+              <input name="recorded_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label>排便あり
+              <input name="bowel_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label>最長無排便
+              <input name="longest_no_bowel_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label>硬い便
+              <input name="hard_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label>痛みの日
+              <input name="pain_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label>がまんの日
+              <input name="withholding_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label>便もれ
+              <input name="soiling_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label>内服できた日
+              <input name="med_taken_days" type="number" min="0" max="31" inputmode="numeric">
+            </label>
+            <label class="wide">日誌メモ
+              <textarea name="diary_note"></textarea>
+            </label>
+          </div>
+        </section>
+
         <div class="actions">
-          <button type="button" data-save-action="both">両方とも保存</button>
+          <button type="button" data-save-action="both">入力した履歴を保存</button>
           <button class="secondary" type="button" data-save-action="prescription">処方履歴だけ保存</button>
           <button class="secondary" type="button" data-save-action="toiletTraining">トイレトレーニング履歴だけ保存</button>
+          <button class="secondary" type="button" data-save-action="visitSummary">過去受診要約だけ保存</button>
+          <button class="secondary" type="button" data-save-action="diaryWeekly">週次日誌だけ保存</button>
         </div>
       </form>
+
+      <section class="panel">
+        <h2>これまでの情報を編集</h2>
+        <p class="meta">直近${escapeHtml_(normalizeLimit_(params.limit, 5))}件を表示しています。さらに古い記録はURL作成画面の取得件数を増やして開いてください。</p>
+        <details class="edit-section" open>
+          <summary>受診・問診履歴</summary>
+          <div class="edit-list">${editVisitsHtml}</div>
+        </details>
+        <details class="edit-section">
+          <summary>処方履歴</summary>
+          <div class="edit-list">${editPrescriptionsHtml}</div>
+        </details>
+        <details class="edit-section">
+          <summary>トイレトレーニング履歴</summary>
+          <div class="edit-list">${editTrainingHtml}</div>
+        </details>
+        <details class="edit-section">
+          <summary>週次日誌</summary>
+          <div class="edit-list">${editDiaryHtml}</div>
+        </details>
+      </section>
     </main>
     <script>
       const form = document.getElementById("doctorEntryForm");
@@ -1486,6 +1784,8 @@ ${medicineRowsHtml}
         both: "saveDoctorEntriesFromDoctorForm",
         prescription: "savePrescriptionFromDoctorForm",
         toiletTraining: "saveToiletTrainingFromDoctorForm",
+        visitSummary: "saveVisitSummaryFromDoctorForm",
+        diaryWeekly: "saveDiaryWeeklyFromDoctorForm",
       };
 
       function setMessage(text, isError) {
@@ -1552,9 +1852,24 @@ ${medicineRowsHtml}
         setCurrentDateTime("training_date");
       }
 
+      function clearVisitSummaryFields() {
+        ["headline", "summary_text", "visit_doctor_note"].forEach((name) => {
+          if (form.elements[name]) form.elements[name].value = "";
+        });
+        setCurrentDateTime("visit_date");
+      }
+
+      function clearDiaryWeeklyFields() {
+        ["recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "diary_note"].forEach((name) => {
+          if (form.elements[name]) form.elements[name].value = "";
+        });
+      }
+
       function clearSavedSections(savedSections) {
         if (savedSections.includes("prescription")) clearPrescriptionFields();
         if (savedSections.includes("toiletTraining")) clearToiletTrainingFields();
+        if (savedSections.includes("visitSummary")) clearVisitSummaryFields();
+        if (savedSections.includes("diaryWeekly")) clearDiaryWeeklyFields();
       }
 
       function setupMedicineRows() {
@@ -1588,10 +1903,185 @@ ${medicineRowsHtml}
             })[handlerName](formObject());
         });
       });
+
+      document.querySelectorAll("[data-edit-form]").forEach((editForm) => {
+        const editButton = editForm.querySelector("[data-edit-save]");
+        const editStatus = editForm.querySelector("[data-edit-status]");
+        if (!editButton) return;
+        editButton.addEventListener("click", () => {
+          const handlerName = editForm.dataset.handler;
+          if (!handlerName || editButton.disabled) return;
+          const editData = {};
+          new FormData(editForm).forEach((value, key) => {
+            editData[key] = value;
+          });
+          editButton.disabled = true;
+          editButton.dataset.originalText = editButton.dataset.originalText || editButton.textContent;
+          editButton.textContent = "更新中...";
+          if (editStatus) editStatus.textContent = "更新中です...";
+          google.script.run
+            .withSuccessHandler((result) => {
+              editButton.disabled = false;
+              editButton.textContent = editButton.dataset.originalText;
+              if (editStatus) editStatus.textContent = (result && result.message) || "更新しました。";
+            })
+            .withFailureHandler((error) => {
+              editButton.disabled = false;
+              editButton.textContent = editButton.dataset.originalText;
+              if (editStatus) editStatus.textContent = "更新できませんでした: " + (error && error.message ? error.message : error);
+            })[handlerName](editData);
+        });
+      });
       setupMedicineRows();
     </script>
   </body>
 </html>`;
+}
+
+function formatVisitEditFormHtml_(visit) {
+  const visitId = String(visit.visit_id || "").trim();
+  const profileOptions = ["unknown", "infant", "toddler", "child"].map((profile) => {
+    const label = profile === "unknown" ? "年齢未確認" : ageProfileLabel_(profile);
+    return `<option value="${escapeHtml_(profile)}" ${normalizeAgeProfile_(visit.age_profile) === profile ? "selected" : ""}>${escapeHtml_(label)}</option>`;
+  }).join("");
+  return `
+          <form class="edit-card" data-edit-form data-handler="saveVisitSummaryFromDoctorForm">
+            <input type="hidden" name="patient_id" value="${escapeHtml_(visit.patient_id)}">
+            <input type="hidden" name="original_visit_id" value="${escapeHtml_(visitId)}">
+            <input type="hidden" name="visit_id" value="${escapeHtml_(visitId)}">
+            <input type="hidden" name="visit_token" value="${escapeHtml_(visit.visit_token || "")}">
+            <input type="hidden" name="questionnaire_json" value="${escapeHtml_(JSON.stringify(visit.questionnaire || {}))}">
+            <input type="hidden" name="diary_json" value="${escapeHtml_(JSON.stringify(visit.diary || {}))}">
+            <input type="hidden" name="questionnaire_version" value="${escapeHtml_(visit.questionnaire_version || "historical-summary")}">
+            <p class="edit-card__title">${escapeHtml_(displayDateTime_(visit.submitted_at || visit.saved_at))} / ${escapeHtml_(visit.headline || "受診記録")}</p>
+            <div class="grid">
+              <label>受診日時
+                <input name="visit_date" type="datetime-local" value="${escapeHtml_(dateTimeInputValue_(visit.submitted_at || visit.saved_at))}">
+              </label>
+              <label>年齢プロファイル
+                <select name="age_profile">${profileOptions}</select>
+              </label>
+              <label>受診時年齢
+                <input name="age_text_at_visit" type="text" value="${escapeHtml_(visit.age_text_at_visit || "")}">
+              </label>
+              <label>区分
+                <input name="urgency_label" type="text" value="${escapeHtml_(visit.urgency_label || "通常確認")}">
+              </label>
+              <label class="wide">見出し
+                <input name="headline" type="text" value="${escapeHtml_(visit.headline || "")}">
+              </label>
+              <label class="wide">要約
+                <textarea name="summary_text">${escapeHtml_(visit.summary_text || "")}</textarea>
+              </label>
+              <label class="wide">医師メモ
+                <textarea name="doctor_note">${escapeHtml_(visit.doctor_note || "")}</textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="button" data-edit-save>この受診記録を更新</button>
+              <span class="meta" data-edit-status></span>
+            </div>
+          </form>`;
+}
+
+function formatPrescriptionEditFormHtml_(row) {
+  const prescriptionId = String(row.prescription_id || "").trim();
+  return `
+          <form class="edit-card" data-edit-form data-handler="updatePrescriptionFromDoctorForm">
+            <input type="hidden" name="patient_id" value="${escapeHtml_(row.patient_id)}">
+            <input type="hidden" name="prescription_id_0" value="${escapeHtml_(prescriptionId)}">
+            <p class="edit-card__title">${escapeHtml_(displayDateTime_(row.date))} / ${escapeHtml_(row.medicine_name || "処方")}</p>
+            <div class="grid">
+              <label>処方日時
+                <input name="prescription_date" type="datetime-local" value="${escapeHtml_(dateTimeInputValue_(row.date))}">
+              </label>
+              <label>薬剤名
+                <input name="medicine_name_0" type="text" list="medicineNameList" value="${escapeHtml_(row.medicine_name || "")}">
+              </label>
+              <label>量
+                <input name="dose_0" type="text" value="${escapeHtml_(row.dose || "")}">
+              </label>
+              <label class="wide">指示内容
+                <textarea name="instruction">${escapeHtml_(row.instruction || "")}</textarea>
+              </label>
+              <label class="wide">医師メモ
+                <textarea name="doctor_note">${escapeHtml_(row.doctor_note || "")}</textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="button" data-edit-save>この処方履歴を更新</button>
+              <span class="meta" data-edit-status></span>
+            </div>
+          </form>`;
+}
+
+function formatToiletTrainingEditFormHtml_(row) {
+  return `
+          <form class="edit-card" data-edit-form data-handler="updateToiletTrainingFromDoctorForm">
+            <input type="hidden" name="patient_id" value="${escapeHtml_(row.patient_id)}">
+            <input type="hidden" name="original_training_date" value="${escapeHtml_(dateTimeInScriptTimezone_(row.date))}">
+            <p class="edit-card__title">${escapeHtml_(displayDateTime_(row.date))} / ${escapeHtml_(row.training_status || "トイレトレーニング")}</p>
+            <div class="grid">
+              <label>記録日時
+                <input name="training_date" type="datetime-local" value="${escapeHtml_(dateTimeInputValue_(row.date))}">
+              </label>
+              <label>トレーニング状況
+                <input name="training_status" type="text" value="${escapeHtml_(row.training_status || "")}">
+              </label>
+              <label>おむつ・パンツ
+                <input name="diaper_status" type="text" value="${escapeHtml_(row.diaper_status || "")}">
+              </label>
+              <label>トイレ拒否
+                <input name="toilet_refusal" type="text" value="${escapeHtml_(row.toilet_refusal || "")}">
+              </label>
+              <label class="wide">メモ
+                <textarea name="note">${escapeHtml_(row.note || "")}</textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="button" data-edit-save>このトイレ履歴を更新</button>
+              <span class="meta" data-edit-status></span>
+            </div>
+          </form>`;
+}
+
+function formatDiaryWeeklyEditFormHtml_(row) {
+  return `
+          <form class="edit-card" data-edit-form data-handler="saveDiaryWeeklyFromDoctorForm">
+            <input type="hidden" name="patient_id" value="${escapeHtml_(row.patient_id)}">
+            <input type="hidden" name="original_period_start" value="${escapeHtml_(displayDate_(row.period_start))}">
+            <input type="hidden" name="original_period_end" value="${escapeHtml_(displayDate_(row.period_end))}">
+            <p class="edit-card__title">${escapeHtml_(displayDate_(row.period_start))} - ${escapeHtml_(displayDate_(row.period_end))} / 週次日誌</p>
+            <div class="grid">
+              <label>開始日
+                <input name="period_start" type="date" value="${escapeHtml_(dateInputValue_(row.period_start))}">
+              </label>
+              <label>終了日
+                <input name="period_end" type="date" value="${escapeHtml_(dateInputValue_(row.period_end))}">
+              </label>
+              ${diaryNumberInputHtml_("recorded_days", "記録日数", row.recorded_days)}
+              ${diaryNumberInputHtml_("bowel_days", "排便あり", row.bowel_days)}
+              ${diaryNumberInputHtml_("longest_no_bowel_days", "最長無排便", row.longest_no_bowel_days)}
+              ${diaryNumberInputHtml_("hard_days", "硬い便", row.hard_days)}
+              ${diaryNumberInputHtml_("pain_days", "痛みの日", row.pain_days)}
+              ${diaryNumberInputHtml_("withholding_days", "がまんの日", row.withholding_days)}
+              ${diaryNumberInputHtml_("soiling_days", "便もれ", row.soiling_days)}
+              ${diaryNumberInputHtml_("med_taken_days", "内服できた日", row.med_taken_days)}
+              <label class="wide">日誌メモ
+                <textarea name="diary_note">${escapeHtml_(row.note || "")}</textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="button" data-edit-save>この週次日誌を更新</button>
+              <span class="meta" data-edit-status></span>
+            </div>
+          </form>`;
+}
+
+function diaryNumberInputHtml_(name, label, value) {
+  return `<label>${escapeHtml_(label)}
+                <input name="${escapeHtml_(name)}" type="number" min="0" max="31" inputmode="numeric" value="${escapeHtml_(value === "" || value === null || value === undefined ? "" : value)}">
+              </label>`;
 }
 
 function generatePatientProfileHtml(params) {

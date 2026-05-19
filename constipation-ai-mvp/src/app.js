@@ -142,6 +142,48 @@ function renderReviewList(items) {
   return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
 }
 
+function patientVisitContextItems() {
+  if (!patientProfileData) return [];
+  const items = [];
+  if (patientProfileData.latest_visit_date) {
+    items.push({
+      label: "前回受診日",
+      value: String(patientProfileData.latest_visit_date),
+    });
+  }
+  if (patientProfileData.latest_prescription_summary) {
+    const date = patientProfileData.latest_prescription_date ? `（${patientProfileData.latest_prescription_date}）` : "";
+    items.push({
+      label: `前回処方${date}`,
+      value: String(patientProfileData.latest_prescription_summary),
+    });
+  }
+  return items;
+}
+
+function renderPatientVisitContext() {
+  const items = patientVisitContextItems();
+  if (!items.length) return "";
+  return `
+    <section class="visit-context" aria-label="前回受診と処方">
+      <h2>前回の記録</h2>
+      <div class="visit-context__grid">
+        ${items
+          .map(
+            (item) => `
+              <div class="visit-context__item">
+                <span>${escapeHtml(item.label)}</span>
+                <strong>${escapeHtml(item.value)}</strong>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+      <p>この内容を見ながら、前回処方の日数に合わせて日誌を入れられます。</p>
+    </section>
+  `;
+}
+
 function renderPhysicianReview(review) {
   return `
     <section class="review-hero review-hero--${escapeHtml(review.urgency.level)}">
@@ -286,6 +328,7 @@ function renderIntro() {
           `
           : ""
       }
+      ${renderPatientVisitContext()}
       <p class="intro-save-note">最後に院内保存の完了表示が出るまで、この画面を閉じずにお待ちください。入力内容は最後にメモとしてコピーできます。</p>
       <button id="startButton" class="button" type="button">はじめる</button>
     </div>
@@ -456,6 +499,7 @@ function renderFinish() {
       <h1>直近日誌を追加できます</h1>
       <p>日誌がない場合やわからない場合は、何も入力せず下の「院内保存へ進む」を押してください。</p>
       <p>次の画面で院内保存を行います。保存完了の表示が出るまで、この画面を閉じずにお待ちください。</p>
+      ${renderPatientVisitContext()}
       ${renderDiaryForm()}
     </div>
   `;

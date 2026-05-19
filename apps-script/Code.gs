@@ -1318,6 +1318,12 @@ function getPatientProfileData(params) {
   const ageProfile = patientAgeProfile_(patient, referenceDate);
   const backgroundSummary = patientBackgroundSummary_(patient, { patientFacing: true });
   const backgroundFlags = normalizeBackgroundFlags_(patient.background_flags);
+  const latestVisit = latestByDate_(rowsForPatient_(SHEET_NAMES.visits, VISITS_HEADERS, patientId).map(parseVisitRow_), 1, "submitted_at")[0] || null;
+  const prescriptions = latestByDate_(rowsForPatient_(SHEET_NAMES.prescriptions, PRESCRIPTIONS_HEADERS, patientId), 10, "date");
+  const latestPrescriptionDate = prescriptions[0] ? displayDateTime_(prescriptions[0].date) : "";
+  const latestPrescriptions = latestPrescriptionDate
+    ? prescriptions.filter((row) => displayDateTime_(row.date) === latestPrescriptionDate)
+    : [];
   return {
     ok: true,
     patient_id: patientId,
@@ -1334,7 +1340,47 @@ function getPatientProfileData(params) {
     background_status: String(patient.background_status || ""),
     background_updated_at: dateInputValue_(patient.background_updated_at),
     has_background_context: Boolean(backgroundSummary),
+    latest_visit: latestVisit ? {
+      submitted_at: displayDateTime_(latestVisit.submitted_at || latestVisit.saved_at),
+      urgency_label: String(latestVisit.urgency_label || ""),
+      headline: String(latestVisit.headline || ""),
+    } : null,
+    latest_visit_date: latestVisit ? displayDateTime_(latestVisit.submitted_at || latestVisit.saved_at) : "",
+    latest_prescriptions: latestPrescriptions.map(profilePrescriptionItem_),
+    latest_prescription_date: latestPrescriptionDate,
+    latest_prescription_summary: profilePrescriptionSummary_(latestPrescriptions),
   };
+}
+
+function profilePrescriptionItem_(row) {
+  return {
+    date: displayDateTime_(row.date),
+    medicine_name: String(row.medicine_name || ""),
+    dose: String(row.dose || ""),
+    days: prescriptionDaysText_(row),
+    instruction: String(row.instruction || ""),
+  };
+}
+
+function profilePrescriptionSummary_(rows) {
+  if (!rows.length) return "";
+  return rows.map((row) => {
+    const parts = [
+      row.medicine_name || "薬剤名未記録",
+      row.dose || "",
+      prescriptionDaysText_(row),
+    ].filter(Boolean);
+    return parts.join(" ");
+  }).join(" / ");
+}
+
+function prescriptionDaysText_(row) {
+  const explicitText = [row.instruction, row.doctor_note, row.dose].map((value) => String(value || "")).join(" ");
+  const daySupplyMatch = explicitText.match(/(\d{1,3})\s*日\s*分/);
+  if (daySupplyMatch) return `${daySupplyMatch[1]}日分`;
+  const durationMatch = explicitText.match(/(?:^|[^\d])(\d{1,3})\s*日(?:間)?(?:処方|$|[、。，,\s])/);
+  if (!durationMatch) return "";
+  return `${durationMatch[1]}日分`;
 }
 
 function patientBackgroundSummary_(patient, options) {

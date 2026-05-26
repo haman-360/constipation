@@ -25,6 +25,15 @@ Apps Scriptエディタで `setupSheets` を選び、実行する。
 - `prescriptions`
 - `toilet_training`
 - `diary_weekly`
+- `DailyPIN`
+
+`DailyPIN` は待合室掲示用の固定QRで使う本日の確認コードを管理するシート。列は `date`, `pin`, `enabled`, `form`, `note`。
+
+- `date`: 当日の日付を `yyyy-mm-dd` で入力する。
+- `pin`: 受付で案内する確認コード。
+- `enabled`: 有効な行は `true` と入力する。
+- `form`: `constipation`, `asthma`, `atopic_dermatitis` のいずれか。空欄なら全フォーム共通PINとして扱う。
+- `note`: 任意メモ。
 
 ## 2.5 既存の日付・IDデータを一括変換
 
@@ -89,6 +98,24 @@ http://localhost:8000/visit-link.html
 ```text
 http://localhost:8000/index.html?patient_id=12345&visit_token=A7K2
 ```
+
+## 5.5 疾患固定QRを掲示する
+
+患者ごとに印刷するQRとは別に、待合室や受付に掲示する固定QRを使える。
+
+便秘フォームの固定QR URL例:
+
+```text
+https://haman-360.github.io/constipation/constipation-ai-mvp/index.html?mode=fixed&form=constipation
+```
+
+固定QRでは最初に本人確認画面が出る。患者または保護者は `診察券番号`、`生年月日`、`本日の確認コード` を入力する。
+
+認証に使う確認コードは `DailyPIN` シートで管理する。当日の日付に一致し、`enabled` が `true` のPINだけが有効。`form` が空欄のPINは全フォーム共通、`constipation` のPINは便秘フォーム専用として扱う。
+
+認証に失敗した場合は、PIN・診察券番号・生年月日のどれが違うかを区別せず、受付へ案内する同一メッセージを表示する。
+
+喘息・アトピー用のURL受け口は `form=asthma`, `form=atopic_dermatitis` の形にしているが、初期実装では便秘フォームのみ有効。
 
 注意: `127.0.0.1` は開いている端末自身を指すため、iPhoneで読むQRには使えない。iPhoneからMac上のローカルサーバーを開く場合は、MacとiPhoneを同じWi-Fiに接続し、問診アプリURLを `http://MacのIPアドレス:8001/index.html` の形にする。例: `http://192.168.11.3:8001/index.html`。
 

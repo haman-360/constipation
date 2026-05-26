@@ -6,6 +6,7 @@ const SHEET_NAMES = {
   prescriptions: "prescriptions",
   toiletTraining: "toilet_training",
   diaryWeekly: "diary_weekly",
+  dailyPin: "DailyPIN",
 };
 
 const PATIENTS_HEADERS = [
@@ -73,6 +74,14 @@ const DIARY_WEEKLY_HEADERS = [
   "withholding_days",
   "soiling_days",
   "med_taken_days",
+  "note",
+];
+
+const DAILY_PIN_HEADERS = [
+  "date",
+  "pin",
+  "enabled",
+  "form",
   "note",
 ];
 
@@ -152,6 +161,7 @@ const SHEET_DEFINITIONS = [
   { name: SHEET_NAMES.prescriptions, headers: PRESCRIPTIONS_HEADERS, widths: [150, 95, 170, 160, 140, 260, 260], plainTextHeaders: ["prescription_id", "patient_id"], dateTimeHeaders: ["date"] },
   { name: SHEET_NAMES.toiletTraining, headers: TOILET_TRAINING_HEADERS, widths: [95, 170, 150, 140, 140, 260], plainTextHeaders: ["patient_id"], dateTimeHeaders: ["date"] },
   { name: SHEET_NAMES.diaryWeekly, headers: DIARY_WEEKLY_HEADERS, widths: [95, 120, 120, 110, 110, 160, 100, 100, 125, 125, 130, 260], plainTextHeaders: ["patient_id"], dateHeaders: ["period_start", "period_end"] },
+  { name: SHEET_NAMES.dailyPin, headers: DAILY_PIN_HEADERS, widths: [120, 120, 90, 160, 260], plainTextHeaders: ["pin", "form"], dateHeaders: ["date"] },
 ];
 
 function onOpen() {
@@ -185,6 +195,9 @@ function doGet(e) {
     }
     if (action === "patientProfileData") {
       return jsonResponse_(getPatientProfileData(e.parameter || {}));
+    }
+    if (action === "fixedQrAuth") {
+      return jsonResponse_(authenticateFixedQrPatient(e.parameter || {}));
     }
     throw new Error(`Unsupported action: ${action}`);
   } catch (error) {
@@ -1349,6 +1362,77 @@ function getPatientProfileData(params) {
     latest_prescriptions: latestPrescriptions.map(profilePrescriptionItem_),
     latest_prescription_date: latestPrescriptionDate,
     latest_prescription_summary: profilePrescriptionSummary_(latestPrescriptions),
+  };
+}
+
+function authenticateFixedQrPatient(params) {
+  const form = normalizeFixedForm_(params.form);
+  const patientId = normalizePatientId_(params.patient_id || params.pid);
+  const pin = String(params.pin || "").normalize("NFKC").trim();
+  let birthDate = "";
+  try {
+    birthDate = normalizeBirthDate_(params.birth_date);
+  } catch (error) {
+    return fixedQrAuthFailure_();
+  }
+
+  if (form !== "constipation" || patientId.length !== 5 || !birthDate || !pin) {
+    return fixedQrAuthFailure_();
+  }
+  if (!validateDailyPin_(form, pin, new Date())) {
+    return fixedQrAuthFailure_();
+  }
+
+  const patient = findPatientByIdentity_(patientId, birthDate);
+  if (!patient) return fixedQrAuthFailure_();
+
+  return {
+    ...getPatientProfileData({ patient_id: patientId }),
+    form,
+    fixed_qr: true,
+    visit_token: generateFixedVisitToken_(patientId, form),
+  };
+}
+
+function validateDailyPin_(form, pin, now) {
+  const sheet = getSpreadsheet_().getSheetByName(SHEET_NAMES.dailyPin);
+  if (!sheet || sheet.getLastRow() < 2) return false;
+  const today = dateOnlyInScriptTimezone_(now || new Date());
+  const normalizedPin = String(pin || "").normalize("NFKC").trim();
+  const normalizedForm = normalizeFixedForm_(form);
+  return readSheetObjects_(SHEET_NAMES.dailyPin, DAILY_PIN_HEADERS).some((row) => {
+    const rowDate = dateInputValue_(row.date);
+    const rowPin = String(row.pin || "").normalize("NFKC").trim();
+    const enabled = String(row.enabled || "").normalize("NFKC").trim().toLowerCase();
+    const rowForm = normalizeFixedForm_(row.form);
+    const formMatches = !rowForm || rowForm === normalizedForm;
+    return rowDate === today && rowPin === normalizedPin && enabled === "true" && formMatches;
+  });
+}
+
+function findPatientByIdentity_(patientId, birthDate) {
+  const normalizedPatientId = requirePatientId_(patientId);
+  const normalizedBirthDate = normalizeBirthDate_(birthDate);
+  return rowsForPatient_(SHEET_NAMES.patients, PATIENTS_HEADERS, normalizedPatientId)
+    .find((row) => dateInputValue_(row.birth_date) === normalizedBirthDate) || null;
+}
+
+function normalizeFixedForm_(value) {
+  const form = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+  if (["constipation", "asthma", "atopic_dermatitis"].includes(form)) return form;
+  return "";
+}
+
+function generateFixedVisitToken_(patientId, form) {
+  const uuid = Utilities.getUuid().replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const formPrefix = normalizeFixedForm_(form).slice(0, 1).toUpperCase() || "F";
+  return `F${formPrefix}${uuid}`.slice(0, 12);
+}
+
+function fixedQrAuthFailure_() {
+  return {
+    ok: false,
+    error: "診察券番号、生年月日、または本日の確認コードが確認できません。受付にお声かけください。",
   };
 }
 

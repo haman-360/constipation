@@ -118,7 +118,8 @@ h3 {
 
 .intro,
 .question,
-.finish {
+.finish,
+.fixed-auth {
   padding: 32px;
 }
 
@@ -131,9 +132,61 @@ h3 {
 
 .intro p,
 .question__help,
-.finish p {
+.finish p,
+.fixed-auth p {
   color: var(--muted);
   line-height: 1.7;
+}
+
+.fixed-auth {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.fixed-auth__form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.fixed-auth__field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.fixed-auth__field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.fixed-auth__field input:focus {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.fixed-auth__error {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #e1a09a;
+  border-radius: 8px;
+  background: #fff1ef;
+  color: #9f2b24 !important;
+  font-weight: 800;
+}
+
+.fixed-auth__help {
+  margin-top: 18px;
+  margin-bottom: 0;
 }
 
 .intro-save-note {

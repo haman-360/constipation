@@ -24,11 +24,12 @@ const DEFAULT_SUBMIT_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088
 const urlParams = new URLSearchParams(window.location.search);
 const STAFF_MODES = new Set(["staff", "doctor", "clinician"]);
 const isStaffMode = STAFF_MODES.has(urlParams.get("mode")) || urlParams.get("staff") === "1";
+const fixedQrForm = normalizeFixedForm(urlParams.get("form"));
 const submitUrlFromParam = urlParams.get("submit_url") || urlParams.get("submitUrl") || "";
 if (submitUrlFromParam) localStorage.setItem("constipation_submit_url", submitUrlFromParam);
 const submitUrl = submitUrlFromParam || localStorage.getItem("constipation_submit_url") || DEFAULT_SUBMIT_URL;
 const ageProfileFromUrl = urlParams.get("age_profile") || urlParams.get("profile");
-const visitMetaFromUrl = normalizeVisitMeta({
+let visitMetaFromUrl = normalizeVisitMeta({
   patient_id: urlParams.get("patient_id") || urlParams.get("pid"),
   visit_id: urlParams.get("visit_id") || urlParams.get("vid"),
   visit_token: urlParams.get("visit_token") || urlParams.get("token"),
@@ -49,6 +50,7 @@ const state = {
   diary: {},
   submitted: false,
   dashboardMode: "full",
+  fixedQrAuthenticated: !isFixedQrMode(),
 };
 
 function setActiveAgeProfile(profile, source) {
@@ -61,6 +63,7 @@ function setActiveAgeProfile(profile, source) {
 
 async function loadAgeProfileFromWebApp() {
   if (ageProfileFromUrl) return;
+  if (isFixedQrMode() && !state.fixedQrAuthenticated) return;
   if (!submitUrl || !visitMetaFromUrl.patient_id) {
     profileLookupStatus = "fallback";
     return;
@@ -81,6 +84,22 @@ async function loadAgeProfileFromWebApp() {
   } catch (error) {
     profileLookupStatus = "fallback";
   }
+}
+
+function normalizeFixedForm(value) {
+  const form = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+  return ["constipation", "asthma", "atopic_dermatitis"].includes(form) ? form : "";
+}
+
+function isFixedQrMode() {
+  return urlParams.get("mode") === "fixed" && Boolean(fixedQrForm);
+}
+
+function fixedQrFormLabel(form) {
+  if (form === "constipation") return "便秘問診";
+  if (form === "asthma") return "気管支喘息問診";
+  if (form === "atopic_dermatitis") return "アトピー性皮膚炎問診";
+  return "問診";
 }
 
 const els = {
@@ -123,6 +142,104 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function renderFixedQrAuth(errorMessage = "") {
+  els.progress.hidden = true;
+  els.nav.hidden = true;
+  setDoctorPanelVisible(false);
+  els.screen.innerHTML = `
+    <div class="fixed-auth">
+      <h1>${escapeHtml(fixedQrFormLabel(fixedQrForm))}</h1>
+      <p>診察前の問診を始めるため、受付で案内された内容を入力してください。</p>
+      <form id="fixedQrAuthForm" class="fixed-auth__form" novalidate>
+        <label class="fixed-auth__field">
+          <span>診察券番号</span>
+          <input id="fixedPatientIdInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" required placeholder="例: 00100" />
+        </label>
+        <label class="fixed-auth__field">
+          <span>生年月日</span>
+          <input id="fixedBirthDateInput" type="date" required />
+        </label>
+        <label class="fixed-auth__field">
+          <span>本日の確認コード</span>
+          <input id="fixedPinInput" type="text" inputmode="numeric" autocomplete="off" required />
+        </label>
+        <p id="fixedQrAuthError" class="fixed-auth__error" ${errorMessage ? "" : "hidden"}>${escapeHtml(errorMessage)}</p>
+        <button id="fixedQrAuthButton" class="button" type="submit">確認して問診へ進む</button>
+      </form>
+      <p class="fixed-auth__help">確認できない場合は、受付にお声かけください。</p>
+    </div>
+  `;
+  document.getElementById("fixedQrAuthForm").addEventListener("submit", submitFixedQrAuth);
+  document.getElementById("fixedPatientIdInput").addEventListener("input", (event) => {
+    event.currentTarget.value = String(event.currentTarget.value || "").normalize("NFKC").replace(/\D/g, "").slice(0, 5);
+  });
+}
+
+async function submitFixedQrAuth(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = document.getElementById("fixedQrAuthButton");
+  const error = document.getElementById("fixedQrAuthError");
+  const patientId = String(document.getElementById("fixedPatientIdInput").value || "").normalize("NFKC").replace(/\D/g, "").slice(0, 5);
+  const birthDate = String(document.getElementById("fixedBirthDateInput").value || "").trim();
+  const pin = String(document.getElementById("fixedPinInput").value || "").normalize("NFKC").trim();
+  const genericError = "診察券番号、生年月日、または本日の確認コードが確認できません。受付にお声かけください。";
+
+  if (!submitUrl || patientId.length !== 5 || !birthDate || !pin) {
+    error.textContent = genericError;
+    error.hidden = false;
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "確認中";
+  error.hidden = true;
+  error.textContent = "";
+  try {
+    const url = new URL(submitUrl);
+    url.searchParams.set("action", "fixedQrAuth");
+    url.searchParams.set("form", fixedQrForm);
+    url.searchParams.set("patient_id", patientId);
+    url.searchParams.set("birth_date", birthDate);
+    url.searchParams.set("pin", pin);
+    const response = await fetch(url.toString(), { method: "GET", mode: "cors" });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || genericError);
+    applyFixedQrAuthResult(result);
+    render();
+  } catch (authError) {
+    error.textContent = genericError;
+    error.hidden = false;
+    button.disabled = false;
+    button.textContent = "確認して問診へ進む";
+    form.querySelector("#fixedPinInput").value = "";
+  }
+}
+
+function applyFixedQrAuthResult(result) {
+  patientProfileData = result;
+  visitMetaFromUrl = normalizeVisitMeta({
+    ...visitMetaFromUrl,
+    patient_id: result.patient_id,
+    visit_token: result.visit_token,
+    age_profile: result.age_profile,
+    questionnaire_version: result.questionnaire_version,
+  });
+  if (result.age_profile && result.age_profile !== "unknown") {
+    setActiveAgeProfile(result.age_profile, "fixedQrAuth");
+  } else {
+    profileLookupStatus = "fallback";
+  }
+  state.answers = {
+    age_profile: activeAgeProfile,
+    questionnaire_version: activeQuestionnaireVersion,
+  };
+  state.fixedQrAuthenticated = true;
+  state.started = false;
+  state.index = 0;
+  state.submitted = false;
 }
 
 function renderReviewRows(items) {
@@ -714,7 +831,9 @@ function goBack() {
 }
 
 function render() {
-  if (!state.started) {
+  if (isFixedQrMode() && !state.fixedQrAuthenticated) {
+    renderFixedQrAuth();
+  } else if (!state.started) {
     renderIntro();
   } else if (state.submitted) {
     renderSubmitted();

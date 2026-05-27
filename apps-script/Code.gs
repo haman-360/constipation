@@ -167,6 +167,9 @@ const SHEET_DEFINITIONS = [
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("便秘問診")
+    .addItem("今日の確認コードを作成", "generateTodayDailyPinFromMenu")
+    .addItem("確認コードの毎日自動作成を有効化", "installDailyPinTriggerFromMenu")
+    .addSeparator()
     .addItem("シートを整える", "formatExistingSheets")
     .addItem("日付・IDなどのフォーマットを一括変換", "normalizeExistingFormats")
     .addToUi();
@@ -1433,6 +1436,79 @@ function upsertFixedQrPatientBirthDate_(patientId, birthDate) {
     sheet.getRange(row, 6).setNumberFormat("yyyy-mm-dd").setValue(normalizedBirthDate);
     return { ok: true, created: true };
   });
+}
+
+function generateTodayDailyPin() {
+  return generateDailyPinForDate_(new Date(), "constipation");
+}
+
+function generateTodayDailyPinFromMenu() {
+  const result = generateTodayDailyPin();
+  SpreadsheetApp.getUi().alert(`本日の確認コードを作成しました: ${result.pin}`);
+}
+
+function installDailyPinTrigger() {
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => trigger.getHandlerFunction() === "generateTodayDailyPin")
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+  ScriptApp.newTrigger("generateTodayDailyPin")
+    .timeBased()
+    .everyDays(1)
+    .atHour(6)
+    .create();
+  generateTodayDailyPin();
+  return { ok: true };
+}
+
+function installDailyPinTriggerFromMenu() {
+  installDailyPinTrigger();
+  SpreadsheetApp.getUi().alert("確認コードを毎日6時ごろに自動作成する設定を有効化しました。");
+}
+
+function generateDailyPinForDate_(dateValue, form) {
+  return withScriptLock_(() => {
+    const dateText = dateOnlyInScriptTimezone_(dateValue || new Date());
+    const normalizedForm = normalizeFixedForm_(form) || "constipation";
+    const sheet = getOrCreateSheet_(SHEET_NAMES.dailyPin, DAILY_PIN_HEADERS);
+    const existingRow = findDailyPinRow_(sheet, dateText, normalizedForm);
+    const existingPin = existingRow ? String(sheet.getRange(existingRow, 2).getDisplayValue() || "").trim() : "";
+    const pin = existingPin || randomFourDigitPin_();
+    const note = existingRow
+      ? String(sheet.getRange(existingRow, 5).getValue() || "")
+      : "自動作成";
+
+    if (existingRow) {
+      sheet.getRange(existingRow, 1).setNumberFormat("yyyy-mm-dd").setValue(dateText);
+      sheet.getRange(existingRow, 2).setNumberFormat("@").setValue(pin);
+      sheet.getRange(existingRow, 3).setValue(true);
+      sheet.getRange(existingRow, 4).setNumberFormat("@").setValue(normalizedForm);
+      sheet.getRange(existingRow, 5).setValue(note || "自動作成");
+      return { ok: true, created: false, date: dateText, pin, form: normalizedForm };
+    }
+
+    sheet.appendRow([dateText, pin, true, normalizedForm, note]);
+    const row = sheet.getLastRow();
+    sheet.getRange(row, 1).setNumberFormat("yyyy-mm-dd").setValue(dateText);
+    sheet.getRange(row, 2).setNumberFormat("@").setValue(pin);
+    sheet.getRange(row, 4).setNumberFormat("@").setValue(normalizedForm);
+    return { ok: true, created: true, date: dateText, pin, form: normalizedForm };
+  });
+}
+
+function findDailyPinRow_(sheet, dateText, form) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, DAILY_PIN_HEADERS.length).getValues();
+  const normalizedForm = normalizeFixedForm_(form);
+  for (let index = 0; index < values.length; index += 1) {
+    const rowDate = dateInputValue_(values[index][0]);
+    const rowForm = normalizeFixedForm_(values[index][3]);
+    if (rowDate === dateText && rowForm === normalizedForm) return index + 2;
+  }
+  return 0;
+}
+
+function randomFourDigitPin_() {
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 function validateDailyPin_(form, pin, now) {

@@ -35,6 +35,10 @@ Apps Scriptエディタで `setupSheets` を選び、実行する。
 - `form`: `constipation`, `asthma`, `atopic_dermatitis` のいずれか。空欄なら全フォーム共通PINとして扱う。
 - `note`: 任意メモ。
 
+固定QRを使う場合は、Apps Scriptエディタで `installDailyPinTrigger` を1回実行する。これにより、毎日6時ごろに便秘フォーム用の4桁確認コードが `DailyPIN` に自動作成される。スプレッドシート上部メニューの `便秘問診 > 確認コードの毎日自動作成を有効化` からも設定できる。
+
+当日分を手動で作りたい場合は、`generateTodayDailyPin` を実行するか、スプレッドシート上部メニューの `便秘問診 > 今日の確認コードを作成` を押す。同じ日付・同じフォームの行が既にある場合は、そのPINを維持したまま `enabled` を `true` に戻す。
+
 ## 2.5 既存の日付・IDデータを一括変換
 
 Google Sheetsへ貼り付け済みの日付が `2025/08/01` のようになっている場合や、患者IDが `1234` のように4桁以下になっている場合は、Apps Scriptエディタで `normalizeExistingFormats` を選び、実行する。
@@ -114,6 +118,8 @@ https://haman-360.github.io/constipation/constipation-ai-mvp/index.html?mode=fix
 `patients` シートにその診察券番号の患者台帳があり、生年月日も登録済みなら、そのまま問診へ進む。初診などで患者台帳がない場合、または台帳に生年月日が未登録の場合は、続けて生年月日入力画面を出す。入力された生年月日は `patients.birth_date` に保存し、そのまま問診へ進む。
 
 認証に使う確認コードは `DailyPIN` シートで管理する。当日の日付に一致し、`enabled` が `true` のPINだけが有効。`form` が空欄のPINは全フォーム共通、`constipation` のPINは便秘フォーム専用として扱う。
+
+確認コードは、`installDailyPinTrigger` を1回実行しておけば毎日6時ごろに自動作成される。必要なときは `便秘問診 > 今日の確認コードを作成` で当日分を手動作成できる。
 
 認証に失敗した場合は、PIN・診察券番号・生年月日のどれが違うかを区別せず、受付へ案内する同一メッセージを表示する。
 

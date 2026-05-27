@@ -1376,15 +1376,26 @@ function authenticateFixedQrPatient(params) {
     return fixedQrAuthFailure_();
   }
 
-  if (form !== "constipation" || patientId.length !== 5 || !birthDate || !pin) {
+  if (form !== "constipation" || patientId.length !== 5 || !pin) {
     return fixedQrAuthFailure_();
   }
   if (!validateDailyPin_(form, pin, new Date())) {
     return fixedQrAuthFailure_();
   }
 
-  const patient = findPatientByIdentity_(patientId, birthDate);
-  if (!patient) return fixedQrAuthFailure_();
+  const patient = getPatient_(patientId);
+  const registeredBirthDate = dateInputValue_(patient.birth_date);
+  if (!registeredBirthDate) {
+    if (!birthDate) {
+      return {
+        ok: true,
+        needs_birth_date: true,
+        patient_id: patientId,
+        form,
+      };
+    }
+    upsertFixedQrPatientBirthDate_(patientId, birthDate);
+  }
 
   return {
     ...getPatientProfileData({ patient_id: patientId }),
@@ -1392,6 +1403,36 @@ function authenticateFixedQrPatient(params) {
     fixed_qr: true,
     visit_token: generateFixedVisitToken_(patientId, form),
   };
+}
+
+function upsertFixedQrPatientBirthDate_(patientId, birthDate) {
+  return withScriptLock_(() => {
+    const normalizedPatientId = requirePatientId_(patientId);
+    const normalizedBirthDate = normalizeBirthDate_(birthDate);
+    const sheet = getOrCreateSheet_(SHEET_NAMES.patients, PATIENTS_HEADERS);
+    const existingRow = findPatientRow_(sheet, normalizedPatientId);
+    if (existingRow) {
+      sheet.getRange(existingRow, 1).setNumberFormat("@").setValue(normalizedPatientId);
+      sheet.getRange(existingRow, 6).setNumberFormat("yyyy-mm-dd").setValue(normalizedBirthDate);
+      return { ok: true, created: false };
+    }
+    sheet.appendRow([
+      normalizedPatientId,
+      "",
+      "",
+      new Date().toISOString(),
+      "固定QRから初回登録",
+      normalizedBirthDate,
+      "",
+      "",
+      "",
+      "",
+    ]);
+    const row = sheet.getLastRow();
+    sheet.getRange(row, 1).setNumberFormat("@").setValue(normalizedPatientId);
+    sheet.getRange(row, 6).setNumberFormat("yyyy-mm-dd").setValue(normalizedBirthDate);
+    return { ok: true, created: true };
+  });
 }
 
 function validateDailyPin_(form, pin, now) {

@@ -144,29 +144,34 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function renderFixedQrAuth(errorMessage = "") {
+function renderFixedQrAuth(errorMessage = "", options = {}) {
+  const requiresBirthDate = Boolean(options.requiresBirthDate);
+  const patientIdValue = String(options.patientId || "").replace(/\D/g, "").slice(0, 5);
+  const pinValue = String(options.pin || "").normalize("NFKC").trim();
   els.progress.hidden = true;
   els.nav.hidden = true;
   setDoctorPanelVisible(false);
   els.screen.innerHTML = `
     <div class="fixed-auth">
       <h1>${escapeHtml(fixedQrFormLabel(fixedQrForm))}</h1>
-      <p>診察前の問診を始めるため、受付で案内された内容を入力してください。</p>
+      <p>${requiresBirthDate ? "初回登録のため、生年月日を入力してください。" : "診察前の問診を始めるため、受付で案内された内容を入力してください。"}</p>
       <form id="fixedQrAuthForm" class="fixed-auth__form" novalidate>
         <label class="fixed-auth__field">
           <span>診察券番号</span>
-          <input id="fixedPatientIdInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" required placeholder="例: 00100" />
+          <input id="fixedPatientIdInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" required placeholder="例: 00100" value="${escapeHtml(patientIdValue)}" ${requiresBirthDate ? "readonly" : ""} />
         </label>
-        <label class="fixed-auth__field">
-          <span>生年月日</span>
-          <input id="fixedBirthDateInput" type="date" required />
-        </label>
+        ${requiresBirthDate ? `
+          <label class="fixed-auth__field">
+            <span>生年月日</span>
+            <input id="fixedBirthDateInput" type="date" required />
+          </label>
+        ` : ""}
         <label class="fixed-auth__field">
           <span>本日の確認コード</span>
-          <input id="fixedPinInput" type="text" inputmode="numeric" autocomplete="off" required />
+          <input id="fixedPinInput" type="text" inputmode="numeric" autocomplete="off" required value="${escapeHtml(pinValue)}" ${requiresBirthDate ? "readonly" : ""} />
         </label>
         <p id="fixedQrAuthError" class="fixed-auth__error" ${errorMessage ? "" : "hidden"}>${escapeHtml(errorMessage)}</p>
-        <button id="fixedQrAuthButton" class="button" type="submit">確認して問診へ進む</button>
+        <button id="fixedQrAuthButton" class="button" type="submit">${requiresBirthDate ? "生年月日を登録して問診へ進む" : "確認して問診へ進む"}</button>
       </form>
       <p class="fixed-auth__help">確認できない場合は、受付にお声かけください。</p>
     </div>
@@ -183,11 +188,12 @@ async function submitFixedQrAuth(event) {
   const button = document.getElementById("fixedQrAuthButton");
   const error = document.getElementById("fixedQrAuthError");
   const patientId = String(document.getElementById("fixedPatientIdInput").value || "").normalize("NFKC").replace(/\D/g, "").slice(0, 5);
-  const birthDate = String(document.getElementById("fixedBirthDateInput").value || "").trim();
+  const birthDateInput = document.getElementById("fixedBirthDateInput");
+  const birthDate = birthDateInput ? String(birthDateInput.value || "").trim() : "";
   const pin = String(document.getElementById("fixedPinInput").value || "").normalize("NFKC").trim();
   const genericError = "診察券番号、生年月日、または本日の確認コードが確認できません。受付にお声かけください。";
 
-  if (!submitUrl || patientId.length !== 5 || !birthDate || !pin) {
+  if (!submitUrl || patientId.length !== 5 || !pin || (birthDateInput && !birthDate)) {
     error.textContent = genericError;
     error.hidden = false;
     return;
@@ -207,6 +213,10 @@ async function submitFixedQrAuth(event) {
     const response = await fetch(url.toString(), { method: "GET", mode: "cors" });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || genericError);
+    if (result.needs_birth_date) {
+      renderFixedQrAuth("", { requiresBirthDate: true, patientId, pin });
+      return;
+    }
     applyFixedQrAuthResult(result);
     render();
   } catch (authError) {

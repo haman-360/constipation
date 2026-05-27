@@ -109,7 +109,9 @@ http://localhost:8000/index.html?patient_id=12345&visit_token=A7K2
 https://haman-360.github.io/constipation/constipation-ai-mvp/index.html?mode=fixed&form=constipation
 ```
 
-固定QRでは最初に本人確認画面が出る。患者または保護者は `診察券番号`、`生年月日`、`本日の確認コード` を入力する。
+固定QRでは最初に本人確認画面が出る。患者または保護者は `診察券番号` と `本日の確認コード` を入力する。
+
+`patients` シートにその診察券番号の患者台帳があり、生年月日も登録済みなら、そのまま問診へ進む。初診などで患者台帳がない場合、または台帳に生年月日が未登録の場合は、続けて生年月日入力画面を出す。入力された生年月日は `patients.birth_date` に保存し、そのまま問診へ進む。
 
 認証に使う確認コードは `DailyPIN` シートで管理する。当日の日付に一致し、`enabled` が `true` のPINだけが有効。`form` が空欄のPINは全フォーム共通、`constipation` のPINは便秘フォーム専用として扱う。
 

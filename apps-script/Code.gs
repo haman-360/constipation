@@ -225,7 +225,7 @@ function doPost(e) {
     }
     if (params.action === "savePatientProfile") {
       savePatientProfile_(params);
-      return redirectResponse_(buildSelfUrl_("patientProfile", requirePatientId_(params.patient_id), 5, { message: "患者台帳を保存しました。" }));
+      return redirectResponse_(buildSelfUrl_("patientProfile", requirePatientId_(params.patient_id), 5, { message: "既往歴を保存しました。" }));
     }
     const payload = parseJsonBody_(e);
     const result = submitVisit(payload);
@@ -530,7 +530,7 @@ function savePatientProfile_(params) {
 
 function savePatientProfileFromForm(formObject) {
   savePatientProfile_(formObject || {});
-  return { ok: true, message: "患者台帳を保存しました。" };
+  return { ok: true, message: "既往歴を保存しました。" };
 }
 
 function saveDiaryWeeklyFromDoctorForm(formObject) {
@@ -1094,7 +1094,7 @@ function generateTreatmentReviewContext_(history) {
     "あなたは小児便秘診療の医師向け意思決定支援として回答してください。",
     "診断や処方の最終決定は医師が行います。患者・保護者へ直接指示する文体ではなく、医師が診察で検討・説明するための材料として書いてください。",
     "最新の小児便秘診療ガイドラインや一般的な診療原則と矛盾しにくい方針候補を整理してください。",
-    "外部Web検索やURL引用は不要です。提示された経過、医師入力、日誌、一般的診療原則に基づいて整理してください。",
+    "外部Web検索やURL引用は不要です。提示された経過、医師記録、日誌、一般的診療原則に基づいて整理してください。",
     "薬を急にやめることを急がせず、悪化時の確認点、戻し方の考え方、再診間隔も含めて検討してください。",
     "不確実な点や追加確認が必要な点は、推測で埋めずに明示してください。",
     "長期安定例では、段階的減量を独立した方針候補として必ず評価してください。同量継続は保護者不安への短期的な橋渡しとして扱い、漫然継続や長すぎる再診間隔とは分けて整理してください。",
@@ -1125,10 +1125,10 @@ function generateDoctorHistoryHtml(params) {
   const treatmentContextUrl = buildSelfUrl_("chatGPTContext", history.patient_id, normalizeLimit_(params.limit, 5), { mode: "treatmentReview" });
   const entryUrl = buildSelfUrl_("doctorEntry", history.patient_id, normalizeLimit_(params.limit, 5));
   const profileUrl = buildSelfUrl_("patientProfile", history.patient_id, normalizeLimit_(params.limit, 5));
+  const editUrl = buildSelfUrl_("doctorHistory", history.patient_id, normalizeLimit_(params.limit, 5), { edit: "1" });
+  const editMode = String(params.edit || "") === "1";
   const preVisitItems = formatPreVisitItemsHtml_(history);
-  const visitItems = history.visits.length
-    ? history.visits.map(formatVisitHtml_).join("")
-    : "<p>受診・問診履歴はありません。</p>";
+  const timelineItems = formatHistoryTimelineHtml_(history, editMode);
   return `
 <!doctype html>
 <html lang="ja">
@@ -1136,7 +1136,7 @@ function generateDoctorHistoryHtml(params) {
     <meta charset="utf-8">
     <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>便秘履歴 ${escapeHtml_(history.patient_id)}</title>
+    <title>履歴 ${escapeHtml_(history.patient_id)}</title>
     <style>
       * { box-sizing: border-box; }
       body { margin: 0; background: #f4f7f9; color: #20242a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -1146,8 +1146,6 @@ function generateDoctorHistoryHtml(params) {
       p { line-height: 1.7; }
       .panel { margin-top: 16px; padding: 18px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fff; }
       .meta { color: #5d6673; }
-      .visit { border-top: 1px solid #d9e0e8; padding-top: 14px; margin-top: 14px; }
-      .visit:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
       .headline { font-weight: 800; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
       .item { padding: 10px; border: 1px solid #d9e0e8; border-left-width: 6px; border-radius: 8px; background: #fbfdfe; }
@@ -1161,23 +1159,51 @@ function generateDoctorHistoryHtml(params) {
       .summary-list li { padding: 12px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; line-height: 1.65; }
       .summary-list li:first-child { border-left: 6px solid #bd7b00; background: #fff9e8; }
       .summary-list strong { display: block; margin-bottom: 4px; }
+      .nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+      .nav a { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 12px; border: 1px solid #cdd7df; border-radius: 8px; background: #fff; color: #07576b; text-decoration: none; }
+      .timeline { display: grid; gap: 12px; }
+      .timeline-card { padding: 14px; border: 1px solid #d9e0e8; border-left: 6px solid #8b96a5; border-radius: 8px; background: #fff; }
+      .timeline-card--visit { border-left-color: #0b6f85; }
+      .timeline-card--prescription { border-left-color: #1f8a4c; }
+      .timeline-card--training { border-left-color: #bd7b00; }
+      .timeline-card--diary { border-left-color: #6b5fb5; }
+      .timeline-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; margin-bottom: 8px; }
+      .timeline-kind { display: inline-flex; align-items: center; min-height: 26px; padding: 3px 9px; border-radius: 999px; background: #edf3f6; color: #07576b; font-weight: 800; font-size: .86rem; }
+      .timeline-date { color: #20242a; font-weight: 800; }
+      .timeline-summary { margin: 0 0 10px; font-weight: 800; }
+      .timeline-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+      .timeline-fields div { padding: 8px 10px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; line-height: 1.5; }
+      .timeline-fields dt { color: #5d6673; font-size: .84rem; }
+      .timeline-fields dd { margin: 2px 0 0; }
       details { margin-top: 16px; }
       summary { color: #07576b; cursor: pointer; font-weight: 800; }
+      details.timeline-edit { margin-top: 12px; }
+      details.timeline-edit > summary { padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
+      .edit-card { margin-top: 10px; padding: 14px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
+      .edit-card__title { margin: 0 0 10px; color: #20242a; font-weight: 800; }
+      label, .field-label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
+      input, textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; background: #fff; }
       .copy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
       button { min-height: 40px; padding: 8px 14px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+      button:disabled { cursor: wait; opacity: .62; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
       .copy-status { color: #5d6673; }
       textarea { width: 100%; min-height: 86px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; resize: vertical; }
       pre { overflow: auto; white-space: pre-wrap; line-height: 1.55; padding: 14px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
       a { color: #07576b; font-weight: 800; }
-      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+      @media (max-width: 700px) { .grid, .timeline-fields { grid-template-columns: 1fr; } }
       @media print { body { background: #fff; } main { width: 100%; margin: 0; } .panel { border: 0; } }
     </style>
   </head>
   <body>
     <main>
-      <h1>便秘履歴</h1>
+      <h1>履歴</h1>
       <p class="meta">患者ID: ${escapeHtml_(history.patient_id)} / 年齢: ${escapeHtml_(history.age_text)} / 年齢プロファイル: ${escapeHtml_(history.age_profile_label)} / 受診${history.visits.length}件 / 処方${history.prescriptions.length}件 / トイレトレーニング${history.toilet_training.length}件 / 日誌${history.diary_weekly.length}件</p>
-      <p><a href="${escapeHtml_(entryUrl)}">医師入力を開く</a> / <a href="${escapeHtml_(profileUrl)}">患者台帳を開く</a> / <a href="${escapeHtml_(preVisitContextUrl)}" target="_blank" rel="noreferrer">ChatGPT診察前整理を開く</a> / <a href="${escapeHtml_(treatmentContextUrl)}" target="_blank" rel="noreferrer">ChatGPT治療方針検討を開く</a></p>
+      <nav class="nav" aria-label="医師画面">
+        <a href="${escapeHtml_(entryUrl)}">新規記録</a>
+        <a href="${escapeHtml_(profileUrl)}">既往歴</a>
+        <a href="${escapeHtml_(editUrl)}">記録を編集</a>
+      </nav>
       <section class="panel">
         <h2>患者基本情報</h2>
         <div class="grid">
@@ -1189,54 +1215,50 @@ function generateDoctorHistoryHtml(params) {
         </div>
       </section>
       <section class="panel">
-        <h2>電子カルテ貼り付け用</h2>
-        <p class="meta">最新のQR問診と直近日誌から短文を作ります。処方歴は含めません。</p>
-        <textarea id="emrDoctorMemo" placeholder="必要なら電子カルテに残す医師メモを追記">${escapeHtml_(history.visits[0] && history.visits[0].doctor_note ? history.visits[0].doctor_note : "")}</textarea>
-        <div class="copy-row">
-          <button type="button" id="refreshEmrTextButton">本文を更新</button>
-          <button type="button" id="copyEmrTextButton">電子カルテ用テキストをコピー</button>
-          <span id="emrTextStatus" class="copy-status"></span>
-        </div>
-        <pre id="emrTextOutput">${escapeHtml_(generateEmrTextFromHistory_(history, ""))}</pre>
-      </section>
-      <details>
-        <summary>ChatGPT診察前整理テキストをページ内で表示</summary>
-        <div class="copy-row">
-          <button type="button" data-copy-target="preVisitContextText" data-copy-status="preVisitContextStatus" data-context-mode="preVisit">診察前整理テキストをコピー</button>
-          <span id="preVisitContextStatus" class="copy-status"></span>
-        </div>
-        <pre id="preVisitContextText" data-context-mode="preVisit">未読み込みです。開くかコピーすると読み込みます。</pre>
-      </details>
-      <details>
-        <summary>ChatGPT治療方針検討テキストをページ内で表示</summary>
-        <div class="copy-row">
-          <button type="button" data-copy-target="treatmentContextText" data-copy-status="treatmentContextStatus" data-context-mode="treatmentReview">治療方針検討テキストをコピー</button>
-          <span id="treatmentContextStatus" class="copy-status"></span>
-        </div>
-        <pre id="treatmentContextText" data-context-mode="treatmentReview">未読み込みです。開くかコピーすると読み込みます。</pre>
-      </details>
-      <section class="panel">
         <h2>診察前の確認</h2>
         <ul class="summary-list">
           ${preVisitItems}
         </ul>
       </section>
       <section class="panel">
-        <h2>受診・問診履歴</h2>
-        ${visitItems}
+        <h2>記録タイムライン</h2>
+        <p class="meta">直近${escapeHtml_(normalizeLimit_(params.limit, 5))}件を、記録日時の新しい順に表示しています。</p>
+        <div class="timeline">
+          ${timelineItems}
+        </div>
       </section>
-      <section class="panel">
-        <h2>処方履歴</h2>
-        ${formatSimpleRowsHtml_(history.prescriptions, ["date", "medicine_name", "dose", "instruction", "doctor_note"], HISTORY_LABELS)}
-      </section>
-      <section class="panel">
-        <h2>トイレトレーニング履歴</h2>
-        ${formatSimpleRowsHtml_(history.toilet_training, ["date", "training_status", "diaper_status", "toilet_refusal", "note"], HISTORY_LABELS)}
-      </section>
-      <section class="panel">
-        <h2>週次日誌</h2>
-        ${formatSimpleRowsHtml_(history.diary_weekly, ["period_start", "period_end", "recorded_days", "bowel_days", "longest_no_bowel_days", "hard_days", "pain_days", "withholding_days", "soiling_days", "med_taken_days", "note"], HISTORY_LABELS)}
-      </section>
+      <details class="panel">
+        <summary>支援ツール</summary>
+        <section>
+          <h2>電子カルテ貼り付け</h2>
+          <p class="meta">最新のQR問診と直近日誌から短文を作ります。処方歴は含めません。</p>
+          <textarea id="emrDoctorMemo" placeholder="必要なら電子カルテに残す医師メモを追記">${escapeHtml_(history.visits[0] && history.visits[0].doctor_note ? history.visits[0].doctor_note : "")}</textarea>
+          <div class="copy-row">
+            <button type="button" id="refreshEmrTextButton">本文を更新</button>
+            <button type="button" id="copyEmrTextButton">電子カルテ用テキストをコピー</button>
+            <span id="emrTextStatus" class="copy-status"></span>
+          </div>
+          <pre id="emrTextOutput">${escapeHtml_(generateEmrTextFromHistory_(history, ""))}</pre>
+        </section>
+        <details>
+          <summary>ChatGPT診察前整理</summary>
+          <div class="copy-row">
+            <a href="${escapeHtml_(preVisitContextUrl)}" target="_blank" rel="noreferrer">診察前整理</a>
+            <button type="button" data-copy-target="preVisitContextText" data-copy-status="preVisitContextStatus" data-context-mode="preVisit">診察前整理テキストをコピー</button>
+            <span id="preVisitContextStatus" class="copy-status"></span>
+          </div>
+          <pre id="preVisitContextText" data-context-mode="preVisit">未読み込みです。表示またはコピーすると読み込みます。</pre>
+        </details>
+        <details>
+          <summary>ChatGPT治療方針検討</summary>
+          <div class="copy-row">
+            <a href="${escapeHtml_(treatmentContextUrl)}" target="_blank" rel="noreferrer">治療方針検討</a>
+            <button type="button" data-copy-target="treatmentContextText" data-copy-status="treatmentContextStatus" data-context-mode="treatmentReview">治療方針検討テキストをコピー</button>
+            <span id="treatmentContextStatus" class="copy-status"></span>
+          </div>
+          <pre id="treatmentContextText" data-context-mode="treatmentReview">未読み込みです。表示またはコピーすると読み込みます。</pre>
+        </details>
+      </details>
     </main>
     <script>
       const patientId = ${JSON.stringify(history.patient_id)};
@@ -1311,9 +1333,151 @@ function generateDoctorHistoryHtml(params) {
           }
         });
       });
+      ${doctorEditFormsScript_()}
     </script>
   </body>
 </html>`;
+}
+
+function formatHistoryTimelineHtml_(history, editMode) {
+  const items = [];
+  history.visits.forEach((row) => items.push(historyTimelineVisitItem_(row, editMode)));
+  history.prescriptions.forEach((row) => items.push(historyTimelinePrescriptionItem_(row, editMode)));
+  history.toilet_training.forEach((row) => items.push(historyTimelineTrainingItem_(row, editMode)));
+  history.diary_weekly.forEach((row) => items.push(historyTimelineDiaryItem_(row, editMode)));
+  items.sort((a, b) => b.sortTime - a.sortTime);
+  if (!items.length) return "<p class=\"meta\">記録はまだありません。</p>";
+  return items.map((item) => item.html).join("");
+}
+
+function historyTimelineVisitItem_(visit, editMode) {
+  const date = visit.submitted_at || visit.saved_at;
+  const diary = visit.diary || {};
+  const fields = [
+    ["区分", visit.urgency_label || "区分不明"],
+    ["受診時年齢", visit.age_text_at_visit],
+    ["年齢プロファイル", displayAgeProfile_(visit.age_profile)],
+    ["日誌", [
+      diary.diary_days_recorded === undefined ? "" : `記録${diary.diary_days_recorded}日`,
+      diary.diary_bowel_days === undefined ? "" : `排便${diary.diary_bowel_days}日`,
+      diary.diary_longest_no_bowel_days === undefined ? "" : `最長無排便${diary.diary_longest_no_bowel_days}日`,
+      diary.diary_hard_days === undefined ? "" : `硬便${diary.diary_hard_days}日`,
+      diary.diary_pain_days === undefined ? "" : `痛み${diary.diary_pain_days}日`,
+      diary.diary_med_taken_days === undefined ? "" : `内服${diary.diary_med_taken_days}日`,
+    ].filter(Boolean).join(" / ")],
+    ["医師メモ", visit.doctor_note],
+  ];
+  return historyTimelineItemHtml_("visit", "受診・問診", date, visit.headline || "概要未記録", fields, formatVisitEditFormHtml_(visit), editMode);
+}
+
+function historyTimelinePrescriptionItem_(row, editMode) {
+  const summary = [row.medicine_name || "薬剤名未記録", row.dose ? `量: ${row.dose}` : ""].filter(Boolean).join(" / ");
+  const fields = [
+    ["指示内容", row.instruction],
+    ["医師メモ", row.doctor_note],
+  ];
+  return historyTimelineItemHtml_("prescription", "処方", row.date, summary, fields, formatPrescriptionEditFormHtml_(row), editMode);
+}
+
+function historyTimelineTrainingItem_(row, editMode) {
+  const summary = row.training_status || "トイレトレーニング";
+  const fields = [
+    ["おむつ・パンツ", row.diaper_status],
+    ["トイレ拒否", row.toilet_refusal],
+    ["メモ", row.note],
+  ];
+  return historyTimelineItemHtml_("training", "トイレトレーニング", row.date, summary, fields, formatToiletTrainingEditFormHtml_(row), editMode);
+}
+
+function historyTimelineDiaryItem_(row, editMode) {
+  const date = row.period_end || row.period_start;
+  const summary = `${displayDate_(row.period_start)} - ${displayDate_(row.period_end)}`;
+  const fields = [
+    ["記録日数", row.recorded_days === "" ? "" : `${row.recorded_days}日`],
+    ["排便あり", row.bowel_days === "" ? "" : `${row.bowel_days}日`],
+    ["最長無排便", row.longest_no_bowel_days === "" ? "" : `${row.longest_no_bowel_days}日`],
+    ["硬い便", row.hard_days === "" ? "" : `${row.hard_days}日`],
+    ["痛みの日", row.pain_days === "" ? "" : `${row.pain_days}日`],
+    ["がまんの日", row.withholding_days === "" ? "" : `${row.withholding_days}日`],
+    ["便もれ", row.soiling_days === "" ? "" : `${row.soiling_days}日`],
+    ["内服できた日", row.med_taken_days === "" ? "" : `${row.med_taken_days}日`],
+    ["日誌メモ", row.note],
+  ];
+  return historyTimelineItemHtml_("diary", "週次日誌", date, summary, fields, formatDiaryWeeklyEditFormHtml_(row), editMode);
+}
+
+function historyTimelineItemHtml_(kind, label, date, summary, fields, editFormHtml, editMode) {
+  const fieldHtml = fields
+    .filter((field) => String(field[1] === null || field[1] === undefined ? "" : field[1]).trim() !== "")
+    .map((field) => `<div><dt>${escapeHtml_(field[0])}</dt><dd>${escapeHtml_(field[1])}</dd></div>`)
+    .join("");
+  const fieldsBlockHtml = fieldHtml ? '<dl class="timeline-fields">' + fieldHtml + '</dl>' : "";
+  const editOpenAttribute = editMode ? " open" : "";
+  const html = [
+    `<article class="timeline-card timeline-card--${escapeHtml_(kind)}">`,
+    '<div class="timeline-head">',
+    `<span class="timeline-kind">${escapeHtml_(label)}</span>`,
+    `<span class="timeline-date">${escapeHtml_(displayDateTimeOrDate_(date))}</span>`,
+    '</div>',
+    `<p class="timeline-summary">${escapeHtml_(summary || "記録")}</p>`,
+    fieldsBlockHtml,
+    `<details class="timeline-edit"${editOpenAttribute}>`,
+    '<summary>編集</summary>',
+    editFormHtml,
+    '</details>',
+    '</article>',
+  ].join("");
+  return {
+    sortTime: sortTimeFromValue_(date),
+    html,
+  };
+}
+
+function sortTimeFromValue_(value) {
+  if (value instanceof Date) return value.getTime();
+  const text = String(value || "").trim();
+  if (!text) return 0;
+  const parsed = new Date(text.replace(" ", "T"));
+  const time = parsed.getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function displayDateTimeOrDate_(value) {
+  const text = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return displayDate_(value);
+  return displayDateTime_(value);
+}
+
+function doctorEditFormsScript_() {
+  return `
+      document.querySelectorAll("[data-edit-form]").forEach((editForm) => {
+        const editButton = editForm.querySelector("[data-edit-save]");
+        const editStatus = editForm.querySelector("[data-edit-status]");
+        if (!editButton) return;
+        editButton.addEventListener("click", () => {
+          const handlerName = editForm.dataset.handler;
+          if (!handlerName || editButton.disabled) return;
+          const editData = {};
+          new FormData(editForm).forEach((value, key) => {
+            editData[key] = value;
+          });
+          editButton.disabled = true;
+          editButton.dataset.originalText = editButton.dataset.originalText || editButton.textContent;
+          editButton.textContent = "更新中...";
+          if (editStatus) editStatus.textContent = "更新中です...";
+          google.script.run
+            .withSuccessHandler((result) => {
+              editButton.disabled = false;
+              editButton.textContent = editButton.dataset.originalText;
+              if (editStatus) editStatus.textContent = (result && result.message) || "更新しました。";
+            })
+            .withFailureHandler((error) => {
+              editButton.disabled = false;
+              editButton.textContent = editButton.dataset.originalText;
+              if (editStatus) editStatus.textContent = "更新できませんでした: " + (error && error.message ? error.message : error);
+            })[handlerName](editData);
+        });
+      });`;
 }
 
 function getPatient_(patientId) {
@@ -1678,7 +1842,7 @@ function ageProfileContextLines_(history, mode) {
       ...common,
       "",
       "【この年齢層で特に確認する観点】",
-      "- 年齢未確認です。患者台帳の生年月日を確認してください。",
+      "- 年齢未確認です。既往歴の生年月日を確認してください。",
       "- 問診内容は現MVPの2-3歳向け質問セットとして扱い、年齢に依存する判断は保留してください。",
     ];
   }
@@ -1793,7 +1957,6 @@ function generateDoctorEntryHtml(params) {
   const patientId = requirePatientId_(params.patient_id);
   const nowValue = dateTimeInputValue_(new Date());
   const todayValue = dateInputValue_(new Date());
-  const history = getPatientHistory({ ...params, patient_id: patientId, limit: normalizeLimit_(params.limit, 5) });
   const formAction = serviceUrl_();
   const historyUrl = buildSelfUrl_("doctorHistory", patientId, normalizeLimit_(params.limit, 5));
   const profileUrl = buildSelfUrl_("patientProfile", patientId, normalizeLimit_(params.limit, 5));
@@ -1811,10 +1974,6 @@ function generateDoctorEntryHtml(params) {
                   <input name="dose_unit_${index}" type="text" data-dose-unit placeholder="${index === 0 ? "例: 包/日、ml/kg/日" : ""}">
                 </label>
               </div>`).join("");
-  const editVisitsHtml = history.visits.length ? history.visits.map(formatVisitEditFormHtml_).join("") : "<p class=\"meta\">受診・問診履歴はまだありません。</p>";
-  const editPrescriptionsHtml = history.prescriptions.length ? history.prescriptions.map(formatPrescriptionEditFormHtml_).join("") : "<p class=\"meta\">処方履歴はまだありません。</p>";
-  const editTrainingHtml = history.toilet_training.length ? history.toilet_training.map(formatToiletTrainingEditFormHtml_).join("") : "<p class=\"meta\">トイレトレーニング履歴はまだありません。</p>";
-  const editDiaryHtml = history.diary_weekly.length ? history.diary_weekly.map(formatDiaryWeeklyEditFormHtml_).join("") : "<p class=\"meta\">週次日誌はまだありません。</p>";
   return `
 <!doctype html>
 <html lang="ja">
@@ -1822,7 +1981,7 @@ function generateDoctorEntryHtml(params) {
     <meta charset="utf-8">
     <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>医師入力 ${escapeHtml_(patientId)}</title>
+    <title>新規記録 ${escapeHtml_(patientId)}</title>
     <style>
       * { box-sizing: border-box; }
       body { margin: 0; background: #f4f7f9; color: #20242a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -1837,36 +1996,48 @@ function generateDoctorEntryHtml(params) {
       .notice.saving { border-color: #d6a740; background: #fff7df; color: #7a4d00; }
       .notice.error { border-color: #d8a1a1; background: #fdecec; color: #8a2d2d; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+      .nav a { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 12px; border: 1px solid #cdd7df; border-radius: 8px; background: #fff; color: #07576b; text-decoration: none; }
+      .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
+      .tab-button { min-height: 44px; padding: 8px 12px; border: 1px solid #cdd7df; border-radius: 8px; background: #fff; color: #20242a; font: inherit; font-weight: 800; cursor: pointer; }
+      .tab-button.is-active { border-color: #0b6f85; background: #0b6f85; color: #fff; }
+      .tab-panel[hidden] { display: none; }
       label, .field-label { display: grid; gap: 6px; color: #5d6673; font-weight: 800; }
       input, textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #d9e0e8; border-radius: 8px; color: #20242a; font: inherit; }
       textarea { min-height: 88px; resize: vertical; }
       .wide { grid-column: 1 / -1; }
       .medicine-list { grid-column: 1 / -1; display: grid; gap: 10px; }
       .medicine-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(90px, .7fr) minmax(130px, 1fr); gap: 10px; padding: 12px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
-      .edit-list { display: grid; gap: 12px; }
-      .edit-card { padding: 14px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; }
-      .edit-card__title { margin: 0 0 10px; color: #20242a; font-weight: 800; }
-      details.edit-section > summary { margin-top: 16px; padding: 14px 16px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fff; color: #07576b; cursor: pointer; font-weight: 800; }
       .field-help { margin: 4px 0 0; color: #5d6673; font-size: .9rem; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
       button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
       button.secondary { border: 1px solid #d9e0e8; background: #fff; color: #20242a; }
       button:disabled { cursor: wait; opacity: .62; }
       a { color: #07576b; font-weight: 800; }
-      @media (max-width: 700px) { .grid, .medicine-row { grid-template-columns: 1fr; } }
+      @media (max-width: 700px) { .grid, .medicine-row, .tabs { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <main>
-      <h1>医師入力</h1>
+      <h1>新規記録</h1>
       <p class="meta">患者ID: ${escapeHtml_(patientId)}</p>
-      <p><a href="${escapeHtml_(historyUrl)}">便秘履歴へ戻る</a> / <a href="${escapeHtml_(profileUrl)}">患者台帳を開く</a></p>
+      <nav class="nav" aria-label="医師画面">
+        <a href="${escapeHtml_(historyUrl)}">履歴</a>
+        <a href="${escapeHtml_(profileUrl)}">既往歴</a>
+      </nav>
       <p id="saveMessage" class="notice" ${params.message ? "" : "hidden"}>${params.message ? escapeHtml_(params.message) : ""}</p>
+
+      <div class="tabs" role="tablist" aria-label="新規記録の種類">
+        <button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab-target="prescriptionPanel">処方</button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="trainingPanel">トイレトレーニング</button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="visitSummaryPanel">過去受診要約</button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="diaryWeeklyPanel">週次日誌</button>
+      </div>
 
       <form id="doctorEntryForm" method="post" action="${escapeHtml_(formAction)}" target="_top">
         <input type="hidden" name="patient_id" value="${escapeHtml_(patientId)}">
-        <section class="panel">
-          <h2>処方履歴を追加</h2>
+        <section id="prescriptionPanel" class="panel tab-panel">
+          <h2>処方</h2>
           <div class="grid">
             <label>処方日時
               <input name="prescription_date" type="datetime-local" value="${escapeHtml_(nowValue)}">
@@ -1886,10 +2057,13 @@ ${medicineRowsHtml}
               <span class="field-help">診療側だけで共有したい判断理由、次回確認事項、背景情報を記録します。例: 体重増加より便秘治療を優先、次回食欲と体重を確認。</span>
             </label>
           </div>
+          <div class="actions">
+            <button type="button" data-save-action="prescription">処方を保存</button>
+          </div>
         </section>
 
-        <section class="panel">
-          <h2>トイレトレーニング履歴を追加</h2>
+        <section id="trainingPanel" class="panel tab-panel" hidden>
+          <h2>トイレトレーニング</h2>
           <div class="grid">
             <label>記録日時
               <input name="training_date" type="datetime-local" value="${escapeHtml_(nowValue)}">
@@ -1925,10 +2099,13 @@ ${medicineRowsHtml}
               <textarea name="note"></textarea>
             </label>
           </div>
+          <div class="actions">
+            <button type="button" data-save-action="toiletTraining">トイレトレーニングを保存</button>
+          </div>
         </section>
 
-        <section class="panel">
-          <h2>過去受診要約を追加</h2>
+        <section id="visitSummaryPanel" class="panel tab-panel" hidden>
+          <h2>過去受診要約</h2>
           <div class="grid">
             <label>受診日時
               <input name="visit_date" type="datetime-local" value="${escapeHtml_(nowValue)}">
@@ -1951,10 +2128,13 @@ ${medicineRowsHtml}
               <textarea name="visit_doctor_note" placeholder="例: 次回、減量可否とトイレ拒否を確認。"></textarea>
             </label>
           </div>
+          <div class="actions">
+            <button type="button" data-save-action="visitSummary">過去受診要約を保存</button>
+          </div>
         </section>
 
-        <section class="panel">
-          <h2>週次日誌を追加</h2>
+        <section id="diaryWeeklyPanel" class="panel tab-panel" hidden>
+          <h2>週次日誌</h2>
           <div class="grid">
             <label>開始日
               <input name="period_start" type="date" value="${escapeHtml_(todayValue)}">
@@ -1990,45 +2170,19 @@ ${medicineRowsHtml}
               <textarea name="diary_note"></textarea>
             </label>
           </div>
+          <div class="actions">
+            <button type="button" data-save-action="diaryWeekly">週次日誌を保存</button>
+          </div>
         </section>
-
-        <div class="actions">
-          <button type="button" data-save-action="both">入力した履歴を保存</button>
-          <button class="secondary" type="button" data-save-action="prescription">処方履歴だけ保存</button>
-          <button class="secondary" type="button" data-save-action="toiletTraining">トイレトレーニング履歴だけ保存</button>
-          <button class="secondary" type="button" data-save-action="visitSummary">過去受診要約だけ保存</button>
-          <button class="secondary" type="button" data-save-action="diaryWeekly">週次日誌だけ保存</button>
-        </div>
       </form>
-
-      <section class="panel">
-        <h2>これまでの情報を編集</h2>
-        <p class="meta">直近${escapeHtml_(normalizeLimit_(params.limit, 5))}件を表示しています。さらに古い記録はURL作成画面の取得件数を増やして開いてください。</p>
-        <details class="edit-section" open>
-          <summary>受診・問診履歴</summary>
-          <div class="edit-list">${editVisitsHtml}</div>
-        </details>
-        <details class="edit-section">
-          <summary>処方履歴</summary>
-          <div class="edit-list">${editPrescriptionsHtml}</div>
-        </details>
-        <details class="edit-section">
-          <summary>トイレトレーニング履歴</summary>
-          <div class="edit-list">${editTrainingHtml}</div>
-        </details>
-        <details class="edit-section">
-          <summary>週次日誌</summary>
-          <div class="edit-list">${editDiaryHtml}</div>
-        </details>
-      </section>
     </main>
     <script>
       const form = document.getElementById("doctorEntryForm");
       const message = document.getElementById("saveMessage");
       const buttons = Array.from(document.querySelectorAll("[data-save-action]"));
+      const tabButtons = Array.from(document.querySelectorAll("[data-tab-target]"));
       const medicinePresets = ${medicinePresetJson};
       const handlers = {
-        both: "saveDoctorEntriesFromDoctorForm",
         prescription: "savePrescriptionFromDoctorForm",
         toiletTraining: "saveToiletTrainingFromDoctorForm",
         visitSummary: "saveVisitSummaryFromDoctorForm",
@@ -2131,6 +2285,21 @@ ${medicineRowsHtml}
         });
       }
 
+      function activateTab(targetId) {
+        tabButtons.forEach((button) => {
+          const active = button.dataset.tabTarget === targetId;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        document.querySelectorAll(".tab-panel").forEach((panel) => {
+          panel.hidden = panel.id !== targetId;
+        });
+      }
+
+      tabButtons.forEach((button) => {
+        button.addEventListener("click", () => activateTab(button.dataset.tabTarget));
+      });
+
       buttons.forEach((button) => {
         button.addEventListener("click", () => {
           const handlerName = handlers[button.dataset.saveAction];
@@ -2148,35 +2317,6 @@ ${medicineRowsHtml}
               setBusy(false);
               setMessage("保存できませんでした: " + (error && error.message ? error.message : error), true);
             })[handlerName](formObject());
-        });
-      });
-
-      document.querySelectorAll("[data-edit-form]").forEach((editForm) => {
-        const editButton = editForm.querySelector("[data-edit-save]");
-        const editStatus = editForm.querySelector("[data-edit-status]");
-        if (!editButton) return;
-        editButton.addEventListener("click", () => {
-          const handlerName = editForm.dataset.handler;
-          if (!handlerName || editButton.disabled) return;
-          const editData = {};
-          new FormData(editForm).forEach((value, key) => {
-            editData[key] = value;
-          });
-          editButton.disabled = true;
-          editButton.dataset.originalText = editButton.dataset.originalText || editButton.textContent;
-          editButton.textContent = "更新中...";
-          if (editStatus) editStatus.textContent = "更新中です...";
-          google.script.run
-            .withSuccessHandler((result) => {
-              editButton.disabled = false;
-              editButton.textContent = editButton.dataset.originalText;
-              if (editStatus) editStatus.textContent = (result && result.message) || "更新しました。";
-            })
-            .withFailureHandler((error) => {
-              editButton.disabled = false;
-              editButton.textContent = editButton.dataset.originalText;
-              if (editStatus) editStatus.textContent = "更新できませんでした: " + (error && error.message ? error.message : error);
-            })[handlerName](editData);
         });
       });
       setupMedicineRows();
@@ -2357,7 +2497,7 @@ function generatePatientProfileHtml(params) {
     <meta charset="utf-8">
     <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>患者台帳 ${escapeHtml_(patientId)}</title>
+    <title>既往歴 ${escapeHtml_(patientId)}</title>
     <style>
       * { box-sizing: border-box; }
       body { margin: 0; background: #f4f7f9; color: #20242a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -2378,6 +2518,8 @@ function generatePatientProfileHtml(params) {
       .checkbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
       .checkbox-option { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; border: 1px solid #d9e0e8; border-radius: 8px; background: #fbfdfe; color: #20242a; font-weight: 600; line-height: 1.45; }
       .checkbox-option input { width: auto; min-height: auto; margin-top: 3px; }
+      .nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+      .nav a { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 12px; border: 1px solid #cdd7df; border-radius: 8px; background: #fff; color: #07576b; text-decoration: none; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
       button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: #0b6f85; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
       button:disabled { cursor: wait; opacity: .62; }
@@ -2387,9 +2529,12 @@ function generatePatientProfileHtml(params) {
   </head>
   <body>
     <main>
-      <h1>患者台帳</h1>
+      <h1>既往歴</h1>
       <p class="meta">患者ID: ${escapeHtml_(patientId)} / 表示年齢: ${escapeHtml_(history.age_text)} / 年齢プロファイル: ${escapeHtml_(history.age_profile_label)}</p>
-      <p><a href="${escapeHtml_(historyUrl)}">便秘履歴へ戻る</a> / <a href="${escapeHtml_(entryUrl)}">医師入力を開く</a></p>
+      <nav class="nav" aria-label="医師画面">
+        <a href="${escapeHtml_(historyUrl)}">履歴</a>
+        <a href="${escapeHtml_(entryUrl)}">新規記録</a>
+      </nav>
       <p id="saveMessage" class="notice" ${params.message ? "" : "hidden"}>${params.message ? escapeHtml_(params.message) : ""}</p>
 
       <form id="patientProfileForm" method="post" action="${escapeHtml_(formAction)}" target="_top">
@@ -2430,7 +2575,7 @@ function generatePatientProfileHtml(params) {
           <p class="help">生年月日は患者向けURL、QR、ChatGPT貼り付け用テキストには直接出さず、医師側の年齢表示にだけ使います。基礎疾患・既往歴は医師側履歴とChatGPT貼り付け用テキストに反映します。</p>
         </section>
         <div class="actions">
-          <button type="button" id="savePatientProfileButton">患者台帳を保存</button>
+          <button type="button" id="savePatientProfileButton">既往歴を保存</button>
         </div>
       </form>
     </main>
@@ -2479,7 +2624,7 @@ function generatePatientProfileHtml(params) {
           .withSuccessHandler((result) => {
             button.disabled = false;
             button.textContent = button.dataset.originalText;
-            setMessage((result && result.message) || "患者台帳を保存しました。", false);
+            setMessage((result && result.message) || "既往歴を保存しました。", false);
           })
           .withFailureHandler((error) => {
             button.disabled = false;

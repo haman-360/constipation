@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>医師用履歴URL作成</title>
+    <title>医師画面URL作成</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="link-tool-shell">
       <section class="link-tool panel">
         <div class="link-tool__header">
-          <h1>医師用履歴URL作成</h1>
-          <p>患者IDから、医師用履歴表示、患者台帳、Google Sheets履歴JSON、ChatGPT貼り付け用テキストURLを作成します。</p>
+          <h1>医師画面URL作成</h1>
+          <p>患者IDから、履歴、新規記録、既往歴、支援ツールのURLを作成します。</p>
         </div>
 
         <div class="link-tool__grid">
@@ -35,54 +35,61 @@
         </details>
 
         <div class="link-tool__actions">
-          <button id="openEntryButton" class="button" type="button">医師入力を開く</button>
-          <button id="openProfileButton" class="button" type="button">患者台帳を開く</button>
-          <button id="openDoctorButton" class="button" type="button">医師用履歴を開く</button>
-          <button id="openHistoryButton" class="button" type="button">履歴JSONを開く</button>
-          <button id="openPreVisitContextButton" class="button button--secondary" type="button">診察前整理を開く</button>
-          <button id="openTreatmentContextButton" class="button button--secondary" type="button">治療方針検討を開く</button>
+          <button id="openEntryButton" class="button" type="button">新規記録</button>
+          <button id="openProfileButton" class="button" type="button">既往歴</button>
+          <button id="openDoctorButton" class="button" type="button">履歴</button>
+          <button id="openEditButton" class="button" type="button">記録を編集</button>
+          <button id="openHistoryButton" class="button button--secondary" type="button">履歴JSON</button>
+          <button id="openPreVisitContextButton" class="button button--secondary" type="button">診察前整理</button>
+          <button id="openTreatmentContextButton" class="button button--secondary" type="button">治療方針検討</button>
         </div>
 
         <section class="link-output">
-          <h2>医師入力</h2>
+          <h2>新規記録</h2>
           <pre id="entryUrlOutput"></pre>
-          <p><a id="entryOpenLink" href="#" target="_blank" rel="noreferrer">医師入力を開く</a></p>
+          <p><a id="entryOpenLink" href="#" target="_blank" rel="noreferrer">新規記録</a></p>
         </section>
 
         <section class="link-output">
-          <h2>患者台帳</h2>
+          <h2>既往歴</h2>
           <pre id="profileUrlOutput"></pre>
-          <p><a id="profileOpenLink" href="#" target="_blank" rel="noreferrer">患者台帳を開く</a></p>
+          <p><a id="profileOpenLink" href="#" target="_blank" rel="noreferrer">既往歴</a></p>
         </section>
 
         <section class="link-output">
-          <h2>医師用履歴表示</h2>
+          <h2>履歴</h2>
           <pre id="doctorUrlOutput"></pre>
-          <p><a id="doctorOpenLink" href="#" target="_blank" rel="noreferrer">医師用履歴表示を開く</a></p>
+          <p><a id="doctorOpenLink" href="#" target="_blank" rel="noreferrer">履歴</a></p>
+        </section>
+
+        <section class="link-output">
+          <h2>記録を編集</h2>
+          <pre id="editUrlOutput"></pre>
+          <p><a id="editOpenLink" href="#" target="_blank" rel="noreferrer">記録を編集</a></p>
         </section>
 
         <section class="link-output">
           <h2>患者履歴JSON</h2>
           <pre id="historyUrlOutput"></pre>
-          <p><a id="historyOpenLink" href="#" target="_blank" rel="noreferrer">患者履歴JSONを開く</a></p>
+          <p><a id="historyOpenLink" href="#" target="_blank" rel="noreferrer">患者履歴JSON</a></p>
         </section>
 
         <section class="link-output">
           <h2>ChatGPT診察前整理テキスト</h2>
           <pre id="preVisitContextUrlOutput"></pre>
-          <p><a id="preVisitContextOpenLink" href="#" target="_blank" rel="noreferrer">診察前整理テキストを開く</a></p>
+          <p><a id="preVisitContextOpenLink" href="#" target="_blank" rel="noreferrer">診察前整理テキスト</a></p>
         </section>
 
         <section class="link-output">
           <h2>ChatGPT治療方針検討テキスト</h2>
           <pre id="treatmentContextUrlOutput"></pre>
-          <p><a id="treatmentContextOpenLink" href="#" target="_blank" rel="noreferrer">治療方針検討テキストを開く</a></p>
+          <p><a id="treatmentContextOpenLink" href="#" target="_blank" rel="noreferrer">治療方針検討テキスト</a></p>
         </section>
 
         <p id="historyToolMessage" class="link-tool__message" aria-live="polite"></p>
       </section>
     </main>
 
-    <script src="./src/history-link.js?v=20260511-1"></script>
+    <script src="./src/history-link.js?v=20260606-1"></script>
   </body>
 </html>

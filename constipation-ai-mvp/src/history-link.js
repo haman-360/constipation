@@ -27,6 +27,9 @@ const els = {
 };
 
 const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
+const BLOCKED_WEB_APP_DEPLOYMENTS = [
+  "AKfycbwScEZN9JhcFWE3pld3ofyviNSUnkrVLEAb9GLZIeI",
+];
 
 function sanitizePatientId(value) {
   return String(value || "").normalize("NFKC").replace(/\D/g, "").slice(0, 5);
@@ -49,6 +52,15 @@ function normalizeWebAppUrl(value) {
   } catch (error) {
     return "";
   }
+}
+
+function savedWebAppUrl() {
+  const saved = localStorage.getItem("constipation_web_app_url") || "";
+  if (BLOCKED_WEB_APP_DEPLOYMENTS.some((deploymentId) => saved.includes(deploymentId))) {
+    localStorage.setItem("constipation_web_app_url", DEFAULT_WEB_APP_URL);
+    return DEFAULT_WEB_APP_URL;
+  }
+  return saved || DEFAULT_WEB_APP_URL;
 }
 
 function buildActionUrl(action, extraParams = {}) {
@@ -128,7 +140,7 @@ function openUrl(text) {
   els.message.textContent = "ページを開きました。";
 }
 
-els.webAppUrl.value = localStorage.getItem("constipation_web_app_url") || DEFAULT_WEB_APP_URL;
+els.webAppUrl.value = savedWebAppUrl();
 
 [els.patientId, els.limit, els.webAppUrl].forEach((input) => {
   input.addEventListener("input", () => {

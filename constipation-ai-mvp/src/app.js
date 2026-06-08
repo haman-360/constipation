@@ -20,7 +20,7 @@ const {
   profileBasicIds,
 } = window.ConstipationMvp;
 
-const DEFAULT_SUBMIT_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
+const DEFAULT_SUBMIT_URL = "https://script.google.com/macros/s/AKfycby0yf1ey-IgXgQ9O2K7HDqDH0nFNatMZ5RK3mzXST1jI2Ml3W-5xpTx6iQtPwa14e8/exec";
 const urlParams = new URLSearchParams(window.location.search);
 const STAFF_MODES = new Set(["staff", "doctor", "clinician"]);
 const isStaffMode = STAFF_MODES.has(urlParams.get("mode")) || urlParams.get("staff") === "1";

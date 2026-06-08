@@ -17,7 +17,7 @@ const QR_VERSION = 5;
 const QR_SIZE = 17 + QR_VERSION * 4;
 const QR_DATA_CODEWORDS = 108;
 const QR_ECC_CODEWORDS = 26;
-const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
+const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby0yf1ey-IgXgQ9O2K7HDqDH0nFNatMZ5RK3mzXST1jI2Ml3W-5xpTx6iQtPwa14e8/exec";
 let lookupRequestId = 0;
 let patientLookup = { patientId: "", status: "idle", exists: false };
 

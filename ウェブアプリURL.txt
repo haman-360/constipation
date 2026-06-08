@@ -28,13 +28,13 @@ http://192.168.0.27:8010/index.html?patient_id=66666&visit_token=TEST
 
 ---
 
-https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec
+https://script.google.com/macros/s/AKfycby0yf1ey-IgXgQ9O2K7HDqDH0nFNatMZ5RK3mzXST1jI2Ml3W-5xpTx6iQtPwa14e8/exec
 
 Web URL =
 index.html?patient_id=12345&visit_token=A7K2&submit_url=WEB_APP_URL
 
 ところが、これは開けない。
-index.html?patient_id=12345&visit_token=A7K2&submit_url=https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec
+index.html?patient_id=12345&visit_token=A7K2&submit_url=https://script.google.com/macros/s/AKfycby0yf1ey-IgXgQ9O2K7HDqDH0nFNatMZ5RK3mzXST1jI2Ml3W-5xpTx6iQtPwa14e8/exec
 
 ---
 

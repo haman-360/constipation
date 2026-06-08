@@ -26,7 +26,7 @@ const els = {
   message: document.getElementById("historyToolMessage"),
 };
 
-const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyIGLsSur088ftzSGgwHOuiNeIgBUq7LE2yZiyrsjtQuLE-QXeJuCeeD002m6qBoLzN/exec";
+const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby0yf1ey-IgXgQ9O2K7HDqDH0nFNatMZ5RK3mzXST1jI2Ml3W-5xpTx6iQtPwa14e8/exec";
 const BLOCKED_WEB_APP_DEPLOYMENTS = [
   "AKfycbwScEZN9JhcFWE3pld3ofyviNSUnkrVLEAb9GLZIeI",
 ];

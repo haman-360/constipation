@@ -39,6 +39,42 @@ Apps Scriptエディタで `setupSheets` を選び、実行する。
 
 当日分を手動で作りたい場合は、`generateTodayDailyPin` を実行するか、スプレッドシート上部メニューの `便秘問診 > 今日の確認コードを作成` を押す。同じ日付・同じフォームの行が既にある場合は、そのPINを維持したまま `enabled` を `true` に戻す。
 
+## 2.1 スタッフ用PIN一覧へ自動集約
+
+便秘問診と夜尿問診など、複数の固定QR用PINをスタッフに共有したい場合は、スタッフ用のGoogle Sheetsを1つ作り、各問診プロジェクトから同じシートへ同期する。
+
+この方式では、スタッフ用Google Sheets側に新しいApps Scriptを作る必要はない。便秘側Apps Script、夜尿側Apps Scriptのそれぞれが、毎朝PINを作った直後にスタッフ用Google Sheetsへ1行ずつ書き込む。
+
+スタッフ用Google Sheetsには `StaffDailyPIN` シートが自動作成される。列は `date`, `form`, `label`, `pin`, `source`, `updated_at`, `note`。
+
+- `date`: PINの日付。
+- `form`: `constipation`, `enuresis` などのフォームID。
+- `label`: スタッフ向け表示名。例: `便秘`, `夜尿`。
+- `pin`: スタッフが患者・保護者へ案内する本日の確認コード。
+- `source`: 同期元スプレッドシート名。
+- `updated_at`: 最終同期日時。
+- `note`: 自動作成か既存PINの同期か。
+
+同じ日付・同じ `form` の行がすでにある場合は上書きされる。そのため、スタッフ用一覧は「今日見るべきPINの最新版」として使える。
+
+設定手順:
+
+1. スタッフ用Google Sheetsを1つ新規作成する。
+2. URLの `/d/` と `/edit` の間にある Spreadsheet ID を控える。
+3. 便秘問診のスプレッドシートを開き、上部メニューの `便秘問診 > スタッフ用PIN一覧の連携先を設定` を押す。
+4. 控えたスタッフ用Google Sheetsの Spreadsheet ID を入力する。
+5. 初回確認として `便秘問診 > 今日の確認コードをスタッフ用PIN一覧へ同期` を押す。
+6. スタッフ用Google Sheetsに `StaffDailyPIN` シートが作られ、便秘のPINが表示されることを確認する。
+
+夜尿問診側でも同じ設定が必要。夜尿側Apps Scriptにも同じ同期処理を入れ、`generateTodayDailyPin` 相当の処理で `form` を `enuresis` にしてスタッフ用Google Sheetsへ同期する。スタッフ用Google Sheetsの Spreadsheet ID は便秘側と同じものを設定する。
+
+権限の考え方:
+
+- スタッフ用Google Sheetsは、PINを見せたいスタッフだけに共有する。
+- スタッフ用Google Sheetsには患者氏名・生年月日・問診回答などは入れない。
+- 同期元のApps Script実行ユーザーには、スタッフ用Google Sheetsの編集権限が必要。
+- 固定QRの患者向けWeb Appに、スタッフ用PIN一覧を表示する機能は追加しない。
+
 ## 2.5 既存の日付・IDデータを一括変換
 
 Google Sheetsへ貼り付け済みの日付が `2025/08/01` のようになっている場合や、患者IDが `1234` のように4桁以下になっている場合は、Apps Scriptエディタで `normalizeExistingFormats` を選び、実行する。

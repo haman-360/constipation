@@ -85,6 +85,25 @@ const DAILY_PIN_HEADERS = [
   "note",
 ];
 
+const STAFF_DAILY_PIN_PROPERTY_KEY = "STAFF_DAILY_PIN_SPREADSHEET_ID";
+const STAFF_DAILY_PIN_SHEET_NAME = "StaffDailyPIN";
+const STAFF_DAILY_PIN_HEADERS = [
+  "date",
+  "form",
+  "label",
+  "pin",
+  "source",
+  "updated_at",
+  "note",
+];
+
+const FIXED_FORM_LABELS = {
+  constipation: "便秘",
+  enuresis: "夜尿",
+  asthma: "喘息",
+  atopic_dermatitis: "アトピー性皮膚炎",
+};
+
 const HISTORY_LABELS = {
   date: "日時",
   medicine_name: "薬剤名",
@@ -169,6 +188,8 @@ function onOpen() {
     .createMenu("便秘問診")
     .addItem("今日の確認コードを作成", "generateTodayDailyPinFromMenu")
     .addItem("確認コードの毎日自動作成を有効化", "installDailyPinTriggerFromMenu")
+    .addItem("スタッフ用PIN一覧の連携先を設定", "setStaffDailyPinSpreadsheetIdFromMenu")
+    .addItem("今日の確認コードをスタッフ用PIN一覧へ同期", "syncTodayDailyPinToStaffSheetFromMenu")
     .addSeparator()
     .addItem("シートを整える", "formatExistingSheets")
     .addItem("日付・IDなどのフォーマットを一括変換", "normalizeExistingFormats")
@@ -1439,7 +1460,9 @@ function upsertFixedQrPatientBirthDate_(patientId, birthDate) {
 }
 
 function generateTodayDailyPin() {
-  return generateDailyPinForDate_(new Date(), "constipation");
+  const result = generateDailyPinForDate_(new Date(), "constipation");
+  syncDailyPinToStaffSheet_(result);
+  return result;
 }
 
 function generateTodayDailyPinFromMenu() {
@@ -1463,6 +1486,38 @@ function installDailyPinTrigger() {
 function installDailyPinTriggerFromMenu() {
   installDailyPinTrigger();
   SpreadsheetApp.getUi().alert("確認コードを毎日6時ごろに自動作成する設定を有効化しました。");
+}
+
+function setStaffDailyPinSpreadsheetIdFromMenu() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    "スタッフ用PIN一覧の連携先を設定",
+    "スタッフ用PIN一覧として使うGoogleスプレッドシートのIDを入力してください。空欄で保存すると同期を無効化します。",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+
+  const spreadsheetId = String(response.getResponseText() || "").trim();
+  const properties = PropertiesService.getScriptProperties();
+  if (spreadsheetId) {
+    properties.setProperty(STAFF_DAILY_PIN_PROPERTY_KEY, spreadsheetId);
+    setupStaffDailyPinSheet_(spreadsheetId);
+    ui.alert("スタッフ用PIN一覧の連携先を保存しました。");
+    return;
+  }
+
+  properties.deleteProperty(STAFF_DAILY_PIN_PROPERTY_KEY);
+  ui.alert("スタッフ用PIN一覧への同期を無効化しました。");
+}
+
+function syncTodayDailyPinToStaffSheetFromMenu() {
+  const result = generateDailyPinForDate_(new Date(), "constipation");
+  try {
+    syncDailyPinToStaffSheet_(result, { required: true });
+    SpreadsheetApp.getUi().alert(`スタッフ用PIN一覧へ同期しました: ${result.pin}`);
+  } catch (error) {
+    SpreadsheetApp.getUi().alert(`スタッフ用PIN一覧へ同期できませんでした。\n\n${error.message || error}`);
+  }
 }
 
 function generateDailyPinForDate_(dateValue, form) {
@@ -1525,6 +1580,99 @@ function validateDailyPin_(form, pin, now) {
     const formMatches = !rowForm || rowForm === normalizedForm;
     return rowDate === today && rowPin === normalizedPin && enabled === "true" && formMatches;
   });
+}
+
+function syncDailyPinToStaffSheet_(dailyPin, options) {
+  if (!dailyPin || !dailyPin.date || !dailyPin.pin) return false;
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty(STAFF_DAILY_PIN_PROPERTY_KEY);
+  if (!spreadsheetId) {
+    if (options && options.required) throw new Error("スタッフ用PIN一覧の連携先が未設定です。");
+    return false;
+  }
+
+  try {
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = getOrCreateStaffDailyPinSheet_(spreadsheet);
+    upsertStaffDailyPinRow_(sheet, dailyPin);
+    return true;
+  } catch (error) {
+    Logger.log(`StaffDailyPIN sync failed: ${error.message || error}`);
+    if (options && options.required) throw error;
+    return false;
+  }
+}
+
+function setupStaffDailyPinSheet_(spreadsheetId) {
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  getOrCreateStaffDailyPinSheet_(spreadsheet);
+}
+
+function getOrCreateStaffDailyPinSheet_(spreadsheet) {
+  const sheet = spreadsheet.getSheetByName(STAFF_DAILY_PIN_SHEET_NAME) || spreadsheet.insertSheet(STAFF_DAILY_PIN_SHEET_NAME);
+  const current = sheet.getRange(1, 1, 1, STAFF_DAILY_PIN_HEADERS.length).getValues()[0];
+  const hasHeaders = STAFF_DAILY_PIN_HEADERS.every((header, index) => current[index] === header);
+  if (!hasHeaders) {
+    sheet.getRange(1, 1, 1, STAFF_DAILY_PIN_HEADERS.length).setValues([STAFF_DAILY_PIN_HEADERS]);
+  }
+
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const fullRange = sheet.getRange(1, 1, lastRow, STAFF_DAILY_PIN_HEADERS.length);
+  sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(3);
+  sheet.getRange(1, 1, 1, STAFF_DAILY_PIN_HEADERS.length)
+    .setFontWeight("bold")
+    .setBackground("#e8f3ec")
+    .setVerticalAlignment("middle")
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  fullRange
+    .setFontFamily("Arial")
+    .setFontSize(10)
+    .setVerticalAlignment("top");
+  [110, 140, 140, 90, 180, 160, 260].forEach((width, index) => sheet.setColumnWidth(index + 1, width));
+  sheet.getRange(2, 1, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("yyyy-mm-dd");
+  sheet.getRange(2, 4, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("@");
+  sheet.getRange(2, 6, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
+  if (!sheet.getFilter()) fullRange.createFilter();
+  return sheet;
+}
+
+function upsertStaffDailyPinRow_(sheet, dailyPin) {
+  const dateText = dateInputValue_(dailyPin.date) || dateOnlyInScriptTimezone_(dailyPin.date);
+  const form = normalizeFixedForm_(dailyPin.form) || "constipation";
+  const pin = String(dailyPin.pin || "").normalize("NFKC").trim();
+  const source = getSpreadsheet_().getName();
+  const updatedAt = dateTimeInScriptTimezone_(new Date());
+  const rowValues = [
+    dateText,
+    form,
+    FIXED_FORM_LABELS[form] || form,
+    pin,
+    source,
+    updatedAt,
+    dailyPin.created ? "自動作成" : "既存PINを同期",
+  ];
+  const row = findStaffDailyPinRow_(sheet, dateText, form);
+  if (row) {
+    sheet.getRange(row, 1, 1, STAFF_DAILY_PIN_HEADERS.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+  }
+  const targetRow = row || sheet.getLastRow();
+  sheet.getRange(targetRow, 1).setNumberFormat("yyyy-mm-dd");
+  sheet.getRange(targetRow, 4).setNumberFormat("@").setValue(pin);
+  sheet.getRange(targetRow, 6).setNumberFormat("yyyy-mm-dd hh:mm:ss");
+}
+
+function findStaffDailyPinRow_(sheet, dateText, form) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, STAFF_DAILY_PIN_HEADERS.length).getValues();
+  const normalizedForm = normalizeFixedForm_(form);
+  for (let index = 0; index < values.length; index += 1) {
+    const rowDate = dateInputValue_(values[index][0]);
+    const rowForm = normalizeFixedForm_(values[index][1]);
+    if (rowDate === dateText && rowForm === normalizedForm) return index + 2;
+  }
+  return 0;
 }
 
 function findPatientByIdentity_(patientId, birthDate) {

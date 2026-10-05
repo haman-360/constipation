@@ -20,6 +20,8 @@ const {
   profileBasicIds,
 } = window.ConstipationMvp;
 
+const { diaryPeriodContext } = window.ConstipationDiaryPeriod;
+
 const DEFAULT_SUBMIT_URL = "https://script.google.com/macros/s/AKfycby0yf1ey-IgXgQ9O2K7HDqDH0nFNatMZ5RK3mzXST1jI2Ml3W-5xpTx6iQtPwa14e8/exec";
 const urlParams = new URLSearchParams(window.location.search);
 const STAFF_MODES = new Set(["staff", "doctor", "clinician"]);
@@ -62,7 +64,6 @@ function setActiveAgeProfile(profile, source) {
 }
 
 async function loadAgeProfileFromWebApp() {
-  if (ageProfileFromUrl) return;
   if (isFixedQrMode() && !state.fixedQrAuthenticated) return;
   if (!submitUrl || !visitMetaFromUrl.patient_id) {
     profileLookupStatus = "fallback";
@@ -76,10 +77,12 @@ async function loadAgeProfileFromWebApp() {
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
     patientProfileData = result;
-    if (result.age_profile && result.age_profile !== "unknown") {
-      setActiveAgeProfile(result.age_profile, "patientProfile");
-    } else {
-      profileLookupStatus = "fallback";
+    if (!ageProfileFromUrl) {
+      if (result.age_profile && result.age_profile !== "unknown") {
+        setActiveAgeProfile(result.age_profile, "patientProfile");
+      } else {
+        profileLookupStatus = "fallback";
+      }
     }
   } catch (error) {
     profileLookupStatus = "fallback";
@@ -306,7 +309,7 @@ function renderPatientVisitContext() {
           )
           .join("")}
       </div>
-      <p>この内容を見ながら、前回処方の日数に合わせて日誌を入れられます。</p>
+      <p>${escapeHtml(diaryPeriodContext(patientProfileData.latest_visit_date).message)}</p>
     </section>
   `;
 }
@@ -361,7 +364,7 @@ function renderPhysicianReview(review) {
   `;
 }
 
-function renderDiaryField(id, label, suffix) {
+function renderDiaryField(id, label, suffix, hint = "") {
   const value = state.diary[id] ?? "";
   return `
     <label class="diary-field">
@@ -370,6 +373,7 @@ function renderDiaryField(id, label, suffix) {
         <input class="diary-input" type="number" min="0" max="31" inputmode="numeric" data-diary-id="${escapeHtml(id)}" value="${escapeHtml(value)}" />
         <span>${escapeHtml(suffix)}</span>
       </span>
+      ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
     </label>
   `;
 }
@@ -378,16 +382,18 @@ function renderDiaryForm() {
   return `
     <section class="diary-link" aria-label="直近日誌">
       <div class="diary-link__header">
-        <h2>直近日誌がある場合</h2>
-        <p>空欄のままでも次へ進めます。入力した内容だけ診察前サマリーに追加します。</p>
+        <h2>診察前の日誌</h2>
+        <p>${escapeHtml(diaryPeriodContext(patientProfileData?.latest_visit_date).message)}</p>
+        <p>対象期間の中で、それぞれ何日あったか入力してください。1日に何回出ても「1日」と数えます。当てはまる日がなければ「0」を入力してください。</p>
+        <p>日数は0〜31日で入力します。日誌を毎日つけていなくても、思い出せる範囲で入力できます。確認できる期間が短い場合は「振り返る期間の日数」を変更してください。判断できない項目は受付にご相談ください。メモは任意です。</p>
       </div>
       <div class="diary-grid">
-        ${renderDiaryField("diary_days_recorded", "記録日数", "日")}
-        ${renderDiaryField("diary_bowel_days", "排便あり", "日")}
-        ${renderDiaryField("diary_longest_no_bowel_days", "最長無排便", "日")}
-        ${renderDiaryField("diary_hard_days", "硬い便", "日")}
-        ${renderDiaryField("diary_pain_days", "痛み", "日")}
-        ${renderDiaryField("diary_med_taken_days", "内服できた日", "日")}
+        ${renderDiaryField("diary_days_recorded", "振り返る期間の日数", "日", "例：前回受診から14日間なら14。確認できる期間に合わせて変更できます。")}
+        ${renderDiaryField("diary_bowel_days", "うんちが出た日", "日")}
+        ${renderDiaryField("diary_longest_no_bowel_days", "うんちが続けて出なかった最長の日数", "日", "例：2日続けて出なかったときは2。毎日出ていれば0。")}
+        ${renderDiaryField("diary_hard_days", "硬いうんちが出た日", "日")}
+        ${renderDiaryField("diary_pain_days", "うんちのときに痛がった日", "日")}
+        ${renderDiaryField("diary_med_taken_days", "便秘の飲み薬を飲めた日", "日", "飲み薬を使っていない場合は0。")}
       </div>
       <label class="diary-note">
         <span>日誌メモ</span>
@@ -614,6 +620,10 @@ function updateNextState() {
 }
 
 function renderFinish() {
+  const period = diaryPeriodContext(patientProfileData?.latest_visit_date);
+  if (state.diary.diary_days_recorded === undefined && period.recordedDays !== null) {
+    state.diary.diary_days_recorded = period.recordedDays;
+  }
   state.answers = pruneHiddenAnswers(state.answers);
   els.progress.hidden = true;
   els.nav.hidden = false;
@@ -623,8 +633,8 @@ function renderFinish() {
   setDoctorPanelVisible(false);
   els.screen.innerHTML = `
     <div class="finish">
-      <h1>直近日誌を追加できます</h1>
-      <p>日誌がない場合やわからない場合は、何も入力せず下の「院内保存へ進む」を押してください。</p>
+      <h1>診察前に、うんちとお薬の経過を入力してください</h1>
+      <p>医師がこれまでの経過を確認して診察するために必要です。下の日誌を入力し、「院内保存へ進む」を押してください。</p>
       <p>次の画面で院内保存を行います。保存完了の表示が出るまで、この画面を閉じずにお待ちください。</p>
       ${renderPatientVisitContext()}
       ${renderDiaryForm()}

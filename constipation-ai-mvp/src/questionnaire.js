@@ -419,6 +419,16 @@
     "diary_med_taken_days",
     "diary_note",
   ];
+  const REQUIRED_DIARY_FIELD_IDS = DIARY_FIELD_IDS.filter((id) => id !== "diary_note");
+  const DIARY_FIELD_LABELS = {
+    diary_days_recorded: "記録日数",
+    diary_bowel_days: "排便あり",
+    diary_longest_no_bowel_days: "最長無排便",
+    diary_hard_days: "硬い便",
+    diary_pain_days: "痛み",
+    diary_med_taken_days: "内服できた日",
+    diary_note: "日誌メモ",
+  };
 
   const VISIT_META_FIELD_IDS = ["patient_id", "visit_id", "visit_token", "submitted_at", "age_years", "age_months", "age_profile", "questionnaire_version"];
   const PATIENT_CONTEXT_FIELD_IDS = ["patient_background_registered", "patient_background_change_note", "patient_background_skip_urinary", "patient_background_skip_background"];
@@ -590,6 +600,44 @@
 
   function mergeDiaryAnswers(base, diary) {
     return { ...base, ...normalizeDiaryAnswers(diary || {}) };
+  }
+
+  function validateRequiredDiaryAnswers(input) {
+    const diary = input || {};
+    const missingFields = [];
+    const invalidFields = [];
+    const overRecordedFields = [];
+    const values = {};
+
+    REQUIRED_DIARY_FIELD_IDS.forEach((id) => {
+      const raw = diary[id];
+      if (raw === undefined || raw === null || String(raw).trim() === "") {
+        missingFields.push(id);
+        return;
+      }
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 0 || value > 31) {
+        invalidFields.push(id);
+        return;
+      }
+      values[id] = value;
+    });
+
+    const recordedDays = values.diary_days_recorded;
+    if (recordedDays !== undefined) {
+      REQUIRED_DIARY_FIELD_IDS
+        .filter((id) => id !== "diary_days_recorded")
+        .forEach((id) => {
+          if (values[id] !== undefined && values[id] > recordedDays) overRecordedFields.push(id);
+        });
+    }
+
+    return {
+      ok: !missingFields.length && !invalidFields.length && !overRecordedFields.length,
+      missingFields,
+      invalidFields,
+      overRecordedFields,
+    };
   }
 
   function normalizeVisitMeta(input) {
@@ -1389,6 +1437,8 @@ ${diarySection}
     CHILD_BASIC_IDS,
     ADDITIONAL_ORDER,
     DIARY_FIELD_IDS,
+    REQUIRED_DIARY_FIELD_IDS,
+    DIARY_FIELD_LABELS,
     VISIT_META_FIELD_IDS,
     QUESTIONNAIRE_FIELD_IDS,
     SHORT_QR_FIELD_ALIASES,
@@ -1403,6 +1453,7 @@ ${diarySection}
     pruneHiddenAnswers,
     normalizeDiaryAnswers,
     mergeDiaryAnswers,
+    validateRequiredDiaryAnswers,
     normalizeVisitMeta,
     mergeVisitMeta,
     weeklySummary,

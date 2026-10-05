@@ -1,10 +1,13 @@
 const {
   FIELDS,
   BASIC_IDS,
+  REQUIRED_DIARY_FIELD_IDS,
+  DIARY_FIELD_LABELS,
   visibleFieldIds,
   pruneHiddenAnswers,
   normalizeDiaryAnswers,
   mergeDiaryAnswers,
+  validateRequiredDiaryAnswers,
   normalizeVisitMeta,
   mergeVisitMeta,
   normalizeMultiSelection,
@@ -50,6 +53,7 @@ const state = {
     questionnaire_version: activeQuestionnaireVersion,
   },
   diary: {},
+  diarySubmitAttempted: false,
   submitted: false,
   dashboardMode: "full",
   fixedQrAuthenticated: !isFixedQrMode(),
@@ -249,6 +253,8 @@ function applyFixedQrAuthResult(result) {
     age_profile: activeAgeProfile,
     questionnaire_version: activeQuestionnaireVersion,
   };
+  state.diary = {};
+  state.diarySubmitAttempted = false;
   state.fixedQrAuthenticated = true;
   state.started = false;
   state.index = 0;
@@ -366,11 +372,12 @@ function renderPhysicianReview(review) {
 
 function renderDiaryField(id, label, suffix, hint = "") {
   const value = state.diary[id] ?? "";
+  const isRequired = REQUIRED_DIARY_FIELD_IDS.includes(id);
   return `
     <label class="diary-field">
-      <span>${escapeHtml(label)}</span>
+      <span>${escapeHtml(label)}${isRequired ? `<span class="diary-field__required">必須</span>` : ""}</span>
       <span class="diary-field__control">
-        <input class="diary-input" type="number" min="0" max="31" inputmode="numeric" data-diary-id="${escapeHtml(id)}" value="${escapeHtml(value)}" />
+        <input class="diary-input" type="number" min="0" max="31" step="1" inputmode="numeric" data-diary-id="${escapeHtml(id)}" value="${escapeHtml(value)}" ${isRequired ? "required" : ""} />
         <span>${escapeHtml(suffix)}</span>
       </span>
       ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
@@ -399,14 +406,65 @@ function renderDiaryForm() {
         <span>日誌メモ</span>
         <textarea id="diaryNoteInput" class="text-input text-input--compact" maxlength="200" placeholder="例: 園では出にくい、薬は朝だけ残ることがある">${escapeHtml(state.diary.diary_note || "")}</textarea>
       </label>
+      <div id="diaryError" class="field-error" hidden></div>
     </section>
   `;
+}
+
+function diaryFieldNames(ids) {
+  return ids.map((id) => DIARY_FIELD_LABELS[id] || id).join("、");
+}
+
+function diaryValidationMessage(validation) {
+  const messages = [];
+  if (validation.missingFields.length) messages.push(`${diaryFieldNames(validation.missingFields)}を入力してください。`);
+  if (validation.invalidFields.length) messages.push(`${diaryFieldNames(validation.invalidFields)}は0〜31日の整数で入力してください。`);
+  if (validation.overRecordedFields.length) messages.push(`${diaryFieldNames(validation.overRecordedFields)}は記録日数以下にしてください。`);
+  return messages.join(" ");
+}
+
+function updateDiaryValidationState(showErrors = false) {
+  const validation = validateRequiredDiaryAnswers(state.diary);
+  const error = document.getElementById("diaryError");
+  const invalidIds = new Set([
+    ...validation.missingFields,
+    ...validation.invalidFields,
+    ...validation.overRecordedFields,
+  ]);
+
+  document.querySelectorAll("[data-diary-id]").forEach((input) => {
+    const isInvalid = showErrors && invalidIds.has(input.dataset.diaryId);
+    input.classList.toggle("diary-input--invalid", isInvalid);
+    input.setAttribute("aria-invalid", isInvalid ? "true" : "false");
+  });
+
+  if (error) {
+    error.hidden = validation.ok || !showErrors;
+    error.textContent = validation.ok || !showErrors ? "" : diaryValidationMessage(validation);
+  }
+
+  return validation;
+}
+
+function validateDiaryBeforeSubmit() {
+  state.diarySubmitAttempted = true;
+  const validation = updateDiaryValidationState(true);
+  if (validation.ok) return true;
+  const firstInvalidId = [
+    ...validation.missingFields,
+    ...validation.invalidFields,
+    ...validation.overRecordedFields,
+  ][0];
+  const firstInvalidInput = firstInvalidId ? document.querySelector(`[data-diary-id="${firstInvalidId}"]`) : null;
+  if (firstInvalidInput) firstInvalidInput.focus();
+  return false;
 }
 
 function wireDiaryForm() {
   document.querySelectorAll("[data-diary-id]").forEach((input) => {
     input.addEventListener("input", () => {
       state.diary[input.dataset.diaryId] = input.value;
+      updateDiaryValidationState(state.diarySubmitAttempted);
     });
   });
   const note = document.getElementById("diaryNoteInput");
@@ -625,6 +683,7 @@ function renderFinish() {
     state.diary.diary_days_recorded = period.recordedDays;
   }
   state.answers = pruneHiddenAnswers(state.answers);
+  state.diarySubmitAttempted = false;
   els.progress.hidden = true;
   els.nav.hidden = false;
   els.backButton.disabled = false;
@@ -717,6 +776,7 @@ document.getElementById("restartButton").addEventListener("click", () => {
       questionnaire_version: activeQuestionnaireVersion,
     };
     state.diary = {};
+    state.diarySubmitAttempted = false;
     state.submitted = false;
     state.dashboardMode = "full";
     render();
@@ -827,6 +887,7 @@ function postVisitWithHiddenForm_(sheetsPayload) {
 function goNext() {
   if (!state.started) return;
   if (state.index >= currentFlow().length) {
+    if (!validateDiaryBeforeSubmit()) return;
     state.submitted = true;
     render();
     return;

@@ -4,6 +4,7 @@ const {
   pruneHiddenAnswers,
   normalizeDiaryAnswers,
   mergeDiaryAnswers,
+  validateRequiredDiaryAnswers,
   normalizeVisitMeta,
   mergeVisitMeta,
   weeklySummary,
@@ -1084,6 +1085,64 @@ for (const diaryCase of diaryCases) {
   }
 }
 
+const requiredDiaryValidationCases = [
+  {
+    id: "DIARY-REQUIRED-VALID",
+    input: {
+      diary_days_recorded: "7",
+      diary_bowel_days: "5",
+      diary_longest_no_bowel_days: "3",
+      diary_hard_days: "2",
+      diary_pain_days: "1",
+      diary_med_taken_days: "7",
+    },
+    expected: {
+      ok: true,
+      missingFields: [],
+      invalidFields: [],
+      overRecordedFields: [],
+    },
+  },
+  {
+    id: "DIARY-REQUIRED-MISSING",
+    input: {
+      diary_days_recorded: "7",
+      diary_bowel_days: "",
+      diary_longest_no_bowel_days: "3",
+      diary_hard_days: "0",
+      diary_pain_days: "0",
+      diary_med_taken_days: "7",
+    },
+    expected: {
+      ok: false,
+      missingFields: ["diary_bowel_days"],
+      invalidFields: [],
+      overRecordedFields: [],
+    },
+  },
+  {
+    id: "DIARY-REQUIRED-RANGE-AND-RECORDED",
+    input: {
+      diary_days_recorded: "7",
+      diary_bowel_days: "8",
+      diary_longest_no_bowel_days: "3",
+      diary_hard_days: "1.5",
+      diary_pain_days: "0",
+      diary_med_taken_days: "32",
+    },
+    expected: {
+      ok: false,
+      missingFields: [],
+      invalidFields: ["diary_hard_days", "diary_med_taken_days"],
+      overRecordedFields: ["diary_bowel_days"],
+    },
+  },
+];
+
+for (const validationCase of requiredDiaryValidationCases) {
+  assert.deepStrictEqual(validateRequiredDiaryAnswers(validationCase.input), validationCase.expected, `${validationCase.id}: diary validation mismatch`);
+}
+
 const facilityShareCases = [
   {
     id: "FACILITY-SHARE-WATCH-WITH-DIARY",
@@ -1434,5 +1493,5 @@ assert(!visibleFieldIds(childNoFollowUp).includes("c10_med_note"), "CHILD-PROFIL
 assert(!visibleFieldIds(childNoFollowUp).includes("c11_background_note"), "CHILD-PROFILE: background note should be hidden when no background");
 
 console.log(
-  `${cases.length} MVP questionnaire cases, ${urgencyCases.length} urgency cases, ${medicationCases.length} medication cases, ${medicationBranchCases.length} medication branch cases, ${medicationMultiSelectCases.length} medication multi-select cases, ${recurrenceCases.length} recurrence cases, ${formerAlertCases.length} former alert-now-watch cases, ${watchCases.length} watch cases, ${stableCases.length} stable cases, ${boundaryCases.length} boundary cases, ${diaryCases.length} diary cases, ${facilityShareCases.length} facility share cases, ${patientMemoCases.length} patient memo cases, and ${visitMetaCases.length} visit meta cases plus 1 sheets payload case, 1 short QR case, and 2 age profile cases passed`
+  `${cases.length} MVP questionnaire cases, ${urgencyCases.length} urgency cases, ${medicationCases.length} medication cases, ${medicationBranchCases.length} medication branch cases, ${medicationMultiSelectCases.length} medication multi-select cases, ${recurrenceCases.length} recurrence cases, ${formerAlertCases.length} former alert-now-watch cases, ${watchCases.length} watch cases, ${stableCases.length} stable cases, ${boundaryCases.length} boundary cases, ${diaryCases.length} diary cases, ${requiredDiaryValidationCases.length} required diary validation cases, ${facilityShareCases.length} facility share cases, ${patientMemoCases.length} patient memo cases, and ${visitMetaCases.length} visit meta cases plus 1 sheets payload case, 1 short QR case, and 2 age profile cases passed`
 );
